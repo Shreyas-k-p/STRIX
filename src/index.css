@@ -1,0 +1,144 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-mono: 'JetBrains Mono', monospace;
+    --font-heading: 'Chakra Petch', sans-serif;
+    --font-sans: 'Inter', sans-serif;
+  }
+
+  body {
+    font-family: var(--font-mono);
+    background-color: #020408;
+    color: #e2e8f0;
+  }
+
+  h1, h2, h3, h4, .font-heading {
+    font-family: var(--font-heading);
+    letter-spacing: 0.1em;
+  }
+
+  code, pre, .font-mono {
+    font-family: var(--font-mono);
+  }
+}
+
+/* Hacker Cyberdeck Grid Background */
+.hacker-matrix-bg {
+  background-color: #020408;
+  background-image: 
+    linear-gradient(rgba(0, 255, 65, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 65, 0.05) 1px, transparent 1px),
+    radial-gradient(ellipse at 50% 10%, rgba(0, 255, 65, 0.08) 0%, transparent 60%);
+  background-size: 24px 24px, 24px 24px, 100% 100%;
+}
+
+/* Hazard safety stripes pattern */
+.hazard-stripes {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(0, 255, 65, 0.15),
+    rgba(0, 255, 65, 0.15) 10px,
+    rgba(2, 6, 12, 0.7) 10px,
+    rgba(2, 6, 12, 0.7) 20px
+  );
+}
+
+.hazard-stripes-red {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 0, 51, 0.25),
+    rgba(255, 0, 51, 0.25) 10px,
+    rgba(5, 5, 10, 0.8) 10px,
+    rgba(5, 5, 10, 0.8) 20px
+  );
+}
+
+/* Hacker Cyber Panel with Glowing Matrix Brackets */
+.hud-panel {
+  position: relative;
+  background: rgba(4, 8, 14, 0.95);
+  border: 1px solid rgba(0, 255, 65, 0.3);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.9), inset 0 0 20px rgba(0, 255, 65, 0.03);
+}
+
+.hud-panel::before,
+.hud-panel::after {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  pointer-events: none;
+}
+
+.hud-panel::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid #00ff41;
+  border-left: 2px solid #00ff41;
+  filter: drop-shadow(0 0 4px #00ff41);
+}
+
+.hud-panel::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid #00ff41;
+  border-right: 2px solid #00ff41;
+  filter: drop-shadow(0 0 4px #00ff41);
+}
+
+/* Cyber CRT Scanline Effect */
+.scanline-bg {
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%, 
+    rgba(0, 0, 0, 0.45) 50%
+  ), linear-gradient(
+    90deg,
+    rgba(0, 255, 65, 0.04),
+    rgba(0, 255, 255, 0.02),
+    rgba(0, 255, 65, 0.04)
+  );
+  background-size: 100% 3px, 6px 100%;
+}
+
+/* Glowing text shadows */
+.glow-matrix {
+  text-shadow: 0 0 10px rgba(0, 255, 65, 0.8), 0 0 20px rgba(0, 255, 65, 0.4);
+}
+.glow-cyber {
+  text-shadow: 0 0 10px rgba(0, 255, 255, 0.8), 0 0 20px rgba(0, 255, 255, 0.4);
+}
+.glow-red {
+  text-shadow: 0 0 12px rgba(255, 0, 51, 0.9), 0 0 24px rgba(255, 0, 51, 0.5);
+}
+.glow-amber {
+  text-shadow: 0 0 10px rgba(255, 183, 0, 0.8);
+}
+
+/* Blinking cursor animation */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.animate-blink {
+  animation: blink 1s infinite;
+}
+
+/* Custom Cyber Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #020408;
+}
+::-webkit-scrollbar-thumb {
+  background: #0a2412;
+  border: 1px solid rgba(0, 255, 65, 0.4);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #00ff41;
+  box-shadow: 0 0 8px #00ff41;
+}

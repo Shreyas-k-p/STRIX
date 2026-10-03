@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { SerialManager } from '../communication/serial';
+import { WebSocketManager } from '../communication/websocket';
 
 export interface UseSerialOptions {
   onPacketReceived: (packet: string) => void;
@@ -7,38 +7,30 @@ export interface UseSerialOptions {
 }
 
 export function useSerial({ onPacketReceived, onLog }: UseSerialOptions) {
-  const [isConnected, setIsConnected] = useState<boolean>(false);
-  const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [isDemoMode, setIsDemoMode] = useState(false);
   const [portName, setPortName] = useState<string | null>(null);
-  const [baudRate, setBaudRate] = useState<number>(115200);
-  const [isSupported, setIsSupported] = useState<boolean>(true);
-  const [isConnecting, setIsConnecting] = useState<boolean>(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [isSupported, setIsSupported] = useState(true);
 
-  // Keep stable callbacks in ref to avoid recreating serialManager
   const callbacksRef = useRef({ onPacketReceived, onLog });
-  useEffect(() => {
-    callbacksRef.current = { onPacketReceived, onLog };
-  });
+  useEffect(() => { callbacksRef.current = { onPacketReceived, onLog }; }, [onPacketReceived, onLog]);
 
-  const serialManagerRef = useRef<SerialManager | null>(null);
-
-  if (!serialManagerRef.current) {
-    serialManagerRef.current = new SerialManager({
-      onPacket: (line: string) => {
-        callbacksRef.current.onPacketReceived(line);
-      },
-      onConnect: (info) => {
+  const managerRef = useRef<WebSocketManager | null>(null);
+  if (!managerRef.current) {
+    managerRef.current = new WebSocketManager({
+      onPacket: (message) => callbacksRef.current.onPacketReceived(message),
+      onConnect: () => {
         setIsConnected(true);
-        setPortName(info.portName);
-        setBaudRate(info.baudRate);
         setIsConnecting(false);
-        callbacksRef.current.onLog('INFO', `Connected to ${info.portName} @ ${info.baudRate} baud`);
+        setPortName('ESP2 Wi-Fi / WebSocket');
+        callbacksRef.current.onLog('INFO', 'Connected to ESP2 over Wi-Fi WebSocket');
       },
       onDisconnect: (reason) => {
         setIsConnected(false);
-        setPortName(null);
         setIsConnecting(false);
-        callbacksRef.current.onLog('INFO', `Disconnected: ${reason || 'Port closed'}`);
+        setPortName(null);
+        callbacksRef.current.onLog('INFO', 'ESP2 disconnected: ' + (reason || 'Connection closed'));
       },
       onError: (error) => {
         setIsConnecting(false);
@@ -47,61 +39,39 @@ export function useSerial({ onPacketReceived, onLog }: UseSerialOptions) {
     });
   }
 
-  useEffect(() => {
-    if (serialManagerRef.current) {
-      setIsSupported(serialManagerRef.current.isSupported());
-    }
-  }, []);
+  useEffect(() => { setIsSupported(managerRef.current?.isSupported() ?? false); }, []);
 
-  const connect = useCallback(async (rate = 115200) => {
-    if (!serialManagerRef.current) return false;
+  const connect = useCallback(async () => {
+    if (!managerRef.current) return false;
     setIsConnecting(true);
-    try {
-      const res = await serialManagerRef.current.connect(rate);
-      setIsConnecting(false);
-      return res;
-    } catch {
-      setIsConnecting(false);
-      return false;
-    }
+    const result = await managerRef.current.connect();
+    setIsConnecting(false);
+    return result;
   }, []);
 
   const disconnect = useCallback(async () => {
-    if (!serialManagerRef.current) return;
-    await serialManagerRef.current.disconnect();
+    if (!managerRef.current) return;
+    await managerRef.current.disconnect();
     setIsDemoMode(false);
   }, []);
 
   const sendData = useCallback(async (data: string) => {
-    if (!serialManagerRef.current) return false;
-    return await serialManagerRef.current.write(data);
+    if (!managerRef.current) return false;
+    return managerRef.current.write(data);
   }, []);
 
   const toggleDemoMode = useCallback(() => {
-    if (!serialManagerRef.current) return;
-    if (isDemoMode) {
-      serialManagerRef.current.stopDemoMode();
-      setIsDemoMode(false);
-      setIsConnected(false);
-      setPortName(null);
-      callbacksRef.current.onLog('INFO', 'Demo mode deactivated');
-    } else {
-      setIsDemoMode(true);
-      serialManagerRef.current.startDemoMode();
-      callbacksRef.current.onLog('INFO', 'DEMO MODE ACTIVATED - Simulating telemetry');
-    }
-  }, [isDemoMode]);
+    setIsDemoMode((current) => {
+      const next = !current;
+      setIsConnected(next);
+      setPortName(next ? 'DEMO VIRTUAL LINK' : null);
+      callbacksRef.current.onLog('INFO', next ? 'DEMO MODE ACTIVATED - Simulating telemetry' : 'Demo mode deactivated');
+      return next;
+    });
+  }, []);
 
   return {
-    isConnected,
-    isDemoMode,
-    isConnecting,
-    isSupported,
-    portName,
-    baudRate,
-    connect,
-    disconnect,
-    sendData,
-    toggleDemoMode,
+    isConnected, isDemoMode, isConnecting, isSupported, portName,
+    baudRate: 0, connect, disconnect, sendData, toggleDemoMode,
   };
 }

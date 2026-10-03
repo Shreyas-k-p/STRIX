@@ -2,10 +2,12 @@
  * Browser WebSocket transport for the rover.
  * ESP2 advertises "rover-esp2.local" and exposes TCP port 81.
  */
-export const ESP2_HOST = import.meta.env.VITE_ESP2_HOST || '10.82.165.164';
-export const ESP2_WS_URL = 'ws://' + ESP2_HOST + ':81';
+export const DEFAULT_ESP2_HOST = import.meta.env.VITE_ESP2_HOST || '10.82.165.164';
+export const DEFAULT_ESP2_PORT = import.meta.env.VITE_ESP2_PORT || '81';
+export const ESP2_WS_URL = `ws://${DEFAULT_ESP2_HOST}:${DEFAULT_ESP2_PORT}`;
 
 export interface WebSocketManagerOptions {
+  url?: string;
   onPacket: (message: string) => void;
   onConnect: () => void;
   onDisconnect: (reason?: string) => void;
@@ -17,8 +19,21 @@ export class WebSocketManager {
   private reconnectTimer: number | null = null;
   private manualDisconnect = false;
   private connecting = false;
+  private targetUrl: string;
+  private readonly options: WebSocketManagerOptions;
 
-  constructor(private readonly options: WebSocketManagerOptions) {}
+  constructor(options: WebSocketManagerOptions) {
+    this.options = options;
+    this.targetUrl = options.url || ESP2_WS_URL;
+  }
+
+  getUrl(): string {
+    return this.targetUrl;
+  }
+
+  setUrl(url: string) {
+    this.targetUrl = url;
+  }
 
   isSupported(): boolean {
     return typeof WebSocket !== 'undefined';
@@ -28,7 +43,11 @@ export class WebSocketManager {
     return this.socket?.readyState === WebSocket.OPEN;
   }
 
-  async connect(): Promise<boolean> {
+  async connect(url?: string): Promise<boolean> {
+    if (url) {
+      this.targetUrl = url;
+    }
+
     if (!this.isSupported()) {
       this.options.onError('WebSocket is not supported by this browser.');
       return false;
@@ -36,8 +55,11 @@ export class WebSocketManager {
 
     this.manualDisconnect = false;
 
-    if (this.isConnected() || this.connecting) {
-      return this.isConnected();
+    if (this.isConnected()) {
+      return true;
+    }
+    if (this.connecting) {
+      return false;
     }
 
     this.clearReconnectTimer();
@@ -53,7 +75,7 @@ export class WebSocketManager {
       };
 
       try {
-        const ws = new WebSocket(ESP2_WS_URL);
+        const ws = new WebSocket(this.targetUrl);
         this.socket = ws;
 
         ws.onopen = () => {
@@ -72,7 +94,7 @@ export class WebSocketManager {
         ws.onerror = () => {
           this.connecting = false;
           this.options.onError(
-            'ESP2 WebSocket connection failed: ' + ESP2_WS_URL
+            'ESP2 WebSocket connection failed: ' + this.targetUrl
           );
           settle(false);
         };

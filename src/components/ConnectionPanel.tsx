@@ -1,11 +1,10 @@
 import React from 'react';
 import {
   Network,
-  Usb,
-  Radio,
   Wifi,
   Cpu,
   Layers,
+  Zap,
   CheckCircle,
   XCircle,
   AlertCircle,
@@ -41,34 +40,36 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ connection }) 
     }
   };
 
+  const isEsp2Connected = connection.laptopToEsp2Ws === 'CONNECTED';
+
   const links = [
     {
-      title: 'Laptop GCS ↔ ESP32 #4',
-      sub: 'USB Serial Bus @ 115200 Baud',
-      status: connection.laptopToEsp4,
-      icon: <Usb className="w-4 h-4 text-amber-400" />,
+      title: 'Laptop GCS ↔ ESP2 Main Controller',
+      sub: `Wi-Fi WebSocket (ws://10.82.165.164:81) ${connection.rssi ? `[RSSI: ${connection.rssi} dBm]` : ''}`,
+      status: connection.laptopToEsp2Ws,
+      icon: <Wifi className="w-4 h-4 text-emerald-400" />,
     },
     {
-      title: 'ESP32 #4 ↔ NRF24 ↔ ESP32 #2',
-      sub: `NRF24L01+ 2.4GHz RF Uplink ${connection.rssi ? `[RSSI: ${connection.rssi} dBm]` : ''}`,
-      status: connection.esp4ToEsp2Nrf24,
-      icon: <Radio className="w-4 h-4 text-amber-400" />,
-    },
-    {
-      title: 'ESP32 #2 ↔ ESP32 #1 UART',
-      sub: 'Recon Sensor Telemetry Bus (DHT, MQ, Ultrasonic, IR)',
+      title: 'ESP2 ↔ ESP1 UART Bus',
+      sub: 'Sensors: DHT11 (33), MQ135 (34), HC-SR04 (21/35) & Servo (32)',
       status: connection.esp2ToEsp1Uart,
       icon: <Layers className="w-4 h-4 text-amber-400" />,
     },
     {
-      title: 'ESP32 #2 ↔ ESP32 #3 UART',
-      sub: 'Actuator & Relay Command Bus (6WD + 4 Relays)',
-      status: connection.esp2ToEsp3Uart,
+      title: 'ESP2 ↔ Dual L298N Motor Drivers',
+      sub: '4 H-Bridge Channels (L298N #1: 25,26,27,14,12,13 | L298N #2: 33,32,23,22,21,19)',
+      status: isEsp2Connected ? ('CONNECTED' as const) : ('DISCONNECTED' as const),
       icon: <Cpu className="w-4 h-4 text-amber-400" />,
     },
     {
-      title: 'ESP32-S3 Camera ↔ Wi-Fi Direct',
-      sub: 'Dedicated 802.11 b/g/n High-Bandwidth Video Feed',
+      title: 'ESP2 ↔ 4-Channel Relays',
+      sub: 'Active LOW logic (Mod 1: GPIO 4, 15 | Mod 2: GPIO 18, 5)',
+      status: isEsp2Connected ? ('CONNECTED' as const) : ('DISCONNECTED' as const),
+      icon: <Zap className="w-4 h-4 text-amber-400" />,
+    },
+    {
+      title: 'ESP32-S3 Camera ↔ Laptop Web App',
+      sub: 'Independent Wi-Fi Direct MJPEG Stream (Bypasses ESP2)',
       status: connection.cameraWifi,
       icon: <Wifi className="w-4 h-4 text-cyan-400" />,
     },
@@ -81,7 +82,7 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ connection }) 
         <div className="flex items-center gap-2">
           <Network className="w-4 h-4 text-amber-400" />
           <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-200 font-heading">
-            COMMUNICATION TOPOLOGY & MESH STATUS
+            ESP2 HARDWARE TOPOLOGY & BUS STATUS
           </h3>
         </div>
 
@@ -98,7 +99,7 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ connection }) 
         </div>
       </div>
 
-      {/* 5 Hardware Links Cards */}
+      {/* Hardware Links Cards */}
       <div className="space-y-2 flex-1">
         {links.map((link) => (
           <div
@@ -143,14 +144,14 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ connection }) 
           </span>
         </div>
         <div>
-          Link Quality:{' '}
-          <span className="text-amber-400 font-bold">
-            {connection.rssi ? `${connection.rssi} dBm (Nominal)` : 'Optimal'}
+          Wi-Fi RSSI:{' '}
+          <span className="text-emerald-400 font-bold">
+            {connection.rssi ? `${connection.rssi} dBm` : isEsp2Connected ? 'Connected' : 'N/A'}
           </span>
         </div>
         <div>
-          Watchdog Protocol:{' '}
-          <span className="text-emerald-400 font-bold">ARMED (300ms)</span>
+          Failsafe:{' '}
+          <span className="text-amber-400 font-bold">MANUAL STOP / E-STOP</span>
         </div>
       </div>
     </div>

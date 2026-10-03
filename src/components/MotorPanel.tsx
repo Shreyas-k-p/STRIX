@@ -17,7 +17,7 @@ export const MotorPanel: React.FC<MotorPanelProps> = ({ motorState }) => {
         <div className="flex items-center gap-2">
           <Cpu className="w-4 h-4 text-amber-400" />
           <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-200 font-heading">
-            6WD POWERTRAIN & DUAL L298N DRIVERS
+            POWERTRAIN & DUAL L298N DRIVERS [ESP2 DIRECT]
           </h3>
         </div>
 
@@ -32,20 +32,20 @@ export const MotorPanel: React.FC<MotorPanelProps> = ({ motorState }) => {
                 : 'bg-slate-950 text-slate-500 border-slate-800'
             }`}
           >
-            {motorState.roverDirection} ({motorState.isMoving ? `${motorState.speed} PWM` : 'IDLE'})
+            {motorState.roverDirection} ({motorState.isMoving ? `${motorState.speed} PWM` : 'STOPPED'})
           </span>
         </div>
       </div>
 
       {/* Dual Drivers Side-by-Side Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 flex-1">
-        {/* L298N Driver #1: Port Track (Motors 1, 2, 3) */}
+        {/* L298N Driver #1: Port Track */}
         <div className="bg-slate-950/80 p-3 rounded-lg border border-amber-500/20 flex flex-col gap-2">
           <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
             <span className="text-xs font-black font-mono text-amber-400">
-              L298N #1 [PORT DRIVE BANK]
+              L298N #1 [PORT / LEFT BANK]
             </span>
-            <span className="text-[9px] font-mono text-slate-500">ESP32 #3 UART</span>
+            <span className="text-[9px] font-mono text-slate-500">ESP2 GPIOs 25,26,27,14,12,13</span>
           </div>
 
           <div className="flex flex-col gap-2">
@@ -72,10 +72,13 @@ export const MotorPanel: React.FC<MotorPanelProps> = ({ motorState }) => {
                   </div>
                   <div>
                     <div className="font-bold text-slate-200">
-                      M{m.id} <span className="text-[10px] text-slate-400 font-normal">[{m.name}]</span>
+                      Ch {m.channel || m.id}: <span className="text-[10px] text-amber-300 font-normal">{m.name}</span>
                     </div>
                     <div className="text-[10px] text-slate-400">
-                      DIR: <span className={m.isOn ? 'text-amber-400 font-bold' : 'text-slate-600'}>{m.direction}</span>
+                      PIN: <span className="text-slate-300 font-mono">{m.pins || 'L298N #1'}</span> | DIR:{' '}
+                      <span className={m.isOn ? 'text-amber-400 font-bold' : 'text-slate-600'}>
+                        {m.direction}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -97,13 +100,13 @@ export const MotorPanel: React.FC<MotorPanelProps> = ({ motorState }) => {
           </div>
         </div>
 
-        {/* L298N Driver #2: Starboard Track (Motors 4, 5, 6) */}
+        {/* L298N Driver #2: Starboard Track */}
         <div className="bg-slate-950/80 p-3 rounded-lg border border-amber-500/20 flex flex-col gap-2">
           <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
             <span className="text-xs font-black font-mono text-amber-400">
-              L298N #2 [STARBOARD DRIVE BANK]
+              L298N #2 [STARBOARD / RIGHT BANK]
             </span>
-            <span className="text-[9px] font-mono text-slate-500">ESP32 #3 UART</span>
+            <span className="text-[9px] font-mono text-slate-500">ESP2 GPIOs 33,32,23,22,21,19</span>
           </div>
 
           <div className="flex flex-col gap-2">
@@ -130,10 +133,13 @@ export const MotorPanel: React.FC<MotorPanelProps> = ({ motorState }) => {
                   </div>
                   <div>
                     <div className="font-bold text-slate-200">
-                      M{m.id} <span className="text-[10px] text-slate-400 font-normal">[{m.name}]</span>
+                      Ch {m.channel || m.id}: <span className="text-[10px] text-amber-300 font-normal">{m.name}</span>
                     </div>
                     <div className="text-[10px] text-slate-400">
-                      DIR: <span className={m.isOn ? 'text-amber-400 font-bold' : 'text-slate-600'}>{m.direction}</span>
+                      PIN: <span className="text-slate-300 font-mono">{m.pins || 'L298N #2'}</span> | DIR:{' '}
+                      <span className={m.isOn ? 'text-amber-400 font-bold' : 'text-slate-600'}>
+                        {m.direction}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -158,7 +164,7 @@ export const MotorPanel: React.FC<MotorPanelProps> = ({ motorState }) => {
 
       {/* Pin Abstraction Notice */}
       <div className="mt-3 text-[10px] font-mono text-slate-500 bg-slate-950 p-2 rounded border border-slate-900">
-        🛡️ <span className="text-amber-400 font-bold">MIL-SPEC ABSTRACTION:</span> Outgoing telemetry protocols decouple H-Bridge hardware pins from Ground Control Software.
+        🛡️ <span className="text-amber-400 font-bold">4 H-BRIDGE CHANNELS:</span> Physical 6 wheels are powered across 4 L298N H-Bridge channels directly wired to ESP2 GPIOs.
       </div>
     </div>
   );

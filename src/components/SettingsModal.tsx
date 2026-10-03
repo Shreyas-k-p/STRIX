@@ -19,7 +19,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onSaveWatchdog,
   onSaveThresholds,
 }) => {
-  const [localWatchdog, setLocalWatchdog] = useState<WatchdogConfig>(watchdog);
+  const [localWatchdog] = useState<WatchdogConfig>(watchdog);
   const [localThresholds, setLocalThresholds] = useState<SensorThresholds>(thresholds);
 
   if (!isOpen) return null;
@@ -52,46 +52,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Body */}
         <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs">
-          {/* Watchdog Settings */}
-          <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-3">
+          {/* Motor Safety Model Notice */}
+          <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2">
             <div className="flex items-center gap-2 text-cyan-400 font-bold">
               <Activity className="w-4 h-4" />
-              <span>Communication Watchdog Interlock</span>
+              <span>Motor Safety & Control Architecture</span>
             </div>
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 cursor-pointer text-slate-200">
-                <input
-                  type="checkbox"
-                  checked={localWatchdog.enabled}
-                  onChange={(e) =>
-                    setLocalWatchdog({ ...localWatchdog, enabled: e.target.checked })
-                  }
-                  className="rounded accent-cyan-500"
-                />
-                <span>Enable Safety Watchdog (Auto-STOP on packet loss)</span>
-              </label>
-
-              <div className="flex items-center justify-between gap-4 pt-1">
-                <span className="text-slate-400">Watchdog Timeout (ms):</span>
-                <input
-                  type="number"
-                  min="100"
-                  max="5000"
-                  step="50"
-                  value={localWatchdog.timeoutMs}
-                  onChange={(e) =>
-                    setLocalWatchdog({
-                      ...localWatchdog,
-                      timeoutMs: parseInt(e.target.value, 10) || 300,
-                    })
-                  }
-                  className="w-28 bg-slate-900 border border-slate-700 px-2 py-1 rounded text-cyan-400 font-bold"
-                />
-              </div>
-              <p className="text-[10px] text-slate-500">
-                Default: 300 ms. If rover is moving and no ping/acknowledgment packet is received within this time window, rover executes an immediate emergency stop.
-              </p>
-            </div>
+            <p className="text-[11px] text-slate-300 leading-relaxed">
+              Browser automatic-stop watchdog is disabled. Motors maintain active drive until an explicit
+              <span className="text-amber-400 font-bold"> STOP</span> or
+              <span className="text-red-400 font-bold"> EMERGENCY STOP</span> command is sent, or until ESP2 firmware safety executes.
+            </p>
           </div>
 
           {/* Sensor Thresholds */}

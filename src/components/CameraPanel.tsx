@@ -6,21 +6,17 @@ import {
   Camera,
   Settings,
   WifiOff,
-  AlertCircle,
   Crosshair,
   Eye,
-  Target,
+  AlertCircle,
 } from 'lucide-react';
 import type { CameraState } from '../communication/types';
-import { soundFx } from '../utils/audio';
 
 interface CameraPanelProps {
   cameraState: CameraState;
   onUpdateCameraUrl: (url: string) => void;
   onLog: (level: 'INFO' | 'CMD' | 'TEL' | 'ACK' | 'ERROR', msg: string) => void;
   onCameraStatusChange?: (status: 'CONNECTED' | 'DISCONNECTED') => void;
-  onRotateServo?: (angle: number) => void;
-  servoAngle?: number;
 }
 
 export const CameraPanel: React.FC<CameraPanelProps> = ({
@@ -28,8 +24,6 @@ export const CameraPanel: React.FC<CameraPanelProps> = ({
   onUpdateCameraUrl,
   onLog,
   onCameraStatusChange,
-  onRotateServo,
-  servoAngle = 0,
 }) => {
   const [streamUrl, setStreamUrl] = useState<string>(cameraState.url || 'http://192.168.4.1:81/stream');
   const [inputUrl, setInputUrl] = useState<string>(streamUrl);
@@ -41,7 +35,6 @@ export const CameraPanel: React.FC<CameraPanelProps> = ({
   const [reloadKey, setReloadKey] = useState<number>(0);
   const [isNightVision, setIsNightVision] = useState<boolean>(false);
   const [capturedImages, setCapturedImages] = useState<string[]>([]);
-  const [clickTarget, setClickTarget] = useState<{ x: number; y: number; angle: number } | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -123,32 +116,7 @@ export const CameraPanel: React.FC<CameraPanelProps> = ({
     }
   };
 
-  // Click-to-Aim Turret Feature
-  const handleViewportClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
-    const width = rect.width;
 
-    // Relative FOV offset (-40° to +40°)
-    const ratio = (clickX / width) - 0.5; // -0.5 to +0.5
-    const angleOffset = Math.round(ratio * 80);
-    let targetAngle = (servoAngle + angleOffset) % 360;
-    if (targetAngle < 0) targetAngle += 360;
-
-    setClickTarget({ x: clickX, y: clickY, angle: targetAngle });
-    soundFx.playHackSuccess();
-
-    if (onRotateServo) {
-      onRotateServo(targetAngle);
-      onLog('CMD', `OPTICAL CLICK-TO-AIM: Slew turret to ${targetAngle}° (offset ${angleOffset > 0 ? `+${angleOffset}` : angleOffset}°)`);
-    }
-
-    // Clear click target animation after 2s
-    setTimeout(() => {
-      setClickTarget(null);
-    }, 2000);
-  };
 
   return (
     <div
@@ -241,21 +209,19 @@ export const CameraPanel: React.FC<CameraPanelProps> = ({
         </div>
       </div>
 
-      {/* Camera Stream Viewport (Clickable for Click-To-Aim Turret) */}
+      {/* Camera Stream Viewport (Independent Wi-Fi Feed) */}
       <div
-        onClick={handleViewportClick}
-        className="relative flex-1 flex items-center justify-center bg-black overflow-hidden scanline-bg select-none cursor-crosshair group"
-        title="CLICK ANYWHERE ON VIDEO TO AIM SERVO TURRET TO THAT BEARING"
+        className="relative flex-1 flex items-center justify-center bg-black overflow-hidden scanline-bg select-none group"
       >
         {/* Military HUD Targeting Overlay */}
         <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-3 z-10">
           {/* Top HUD markers */}
           <div className="flex items-center justify-between text-[10px] font-bold text-emerald-400 tracking-wider">
             <span className="bg-black/75 px-2 py-0.5 rounded border border-emerald-500/40 glow-matrix">
-              AZIMUTH: {servoAngle.toString().padStart(3, '0')}° BEARING &bull; FOV: 80°
+              SOURCE: ESP32-S3 WI-FI &bull; INDEPENDENT MJPEG
             </span>
             <span className="bg-black/75 px-2 py-0.5 rounded border border-emerald-500/40 glow-matrix">
-              MODE: CLICK-TO-AIM ACTIVE
+              {isLive && !hasError ? 'VIDEO: ONLINE' : 'VIDEO: STANDBY'}
             </span>
           </div>
 
@@ -266,33 +232,20 @@ export const CameraPanel: React.FC<CameraPanelProps> = ({
             <div className="absolute left-0 right-0 top-1/2 h-px bg-emerald-500/30" />
             {/* Center target brackets */}
             <div className="w-6 h-6 border-t-2 border-b-2 border-emerald-400" />
-            <div className="absolute text-[8px] font-bold text-emerald-400/90 top-3">ELEV: 00°</div>
-            <div className="absolute text-[8px] font-bold text-emerald-400/90 bottom-3">TARGET LOCK: ENGAGED</div>
+            <div className="absolute text-[8px] font-bold text-emerald-400/90 top-3">OPTICS HUD</div>
+            <div className="absolute text-[8px] font-bold text-emerald-400/90 bottom-3">CENTER FOCUS</div>
           </div>
 
           {/* Bottom HUD markers */}
           <div className="flex items-center justify-between text-[10px] font-bold text-emerald-400">
             <span className="bg-black/75 px-2 py-0.5 rounded border border-emerald-500/40">
-              CLICK VIDEO = SLEW TURRET
+              STREAM: {streamUrl}
             </span>
             <span className="bg-black/75 px-2 py-0.5 rounded border border-emerald-500/40">
-              PROTOCOL: MJPEG HTTP:81
+              FORMAT: MJPEG HTTP:81
             </span>
           </div>
         </div>
-
-        {/* Click-To-Aim Laser Target Animation */}
-        {clickTarget && (
-          <div
-            style={{ left: clickTarget.x, top: clickTarget.y }}
-            className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20 flex flex-col items-center animate-ping duration-1000"
-          >
-            <Target className="w-8 h-8 text-rose-500" />
-            <span className="text-[10px] font-black text-rose-400 bg-black/90 px-1 rounded border border-rose-500">
-              LOCK {clickTarget.angle}°
-            </span>
-          </div>
-        )}
 
         {/* Actual Image Stream Element */}
         <img
@@ -328,7 +281,7 @@ export const CameraPanel: React.FC<CameraPanelProps> = ({
               </div>
               <p>1. Connect laptop Wi-Fi to ESP32-S3 access point.</p>
               <p>2. Verify port 81 HTTP MJPEG stream (e.g. http://192.168.4.1:81/stream).</p>
-              <p>3. Optical feed runs independently of NRF24 command channel.</p>
+              <p>3. Optical feed runs independently of ESP2 WebSocket command channel.</p>
             </div>
             <div className="flex gap-2">
               <button

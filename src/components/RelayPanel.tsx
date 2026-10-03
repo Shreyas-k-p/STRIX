@@ -38,11 +38,11 @@ export const RelayPanel: React.FC<RelayPanelProps> = ({
         <div className="flex items-center gap-2">
           <Zap className="w-4 h-4 text-amber-400" />
           <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-200 font-heading">
-            ARMORED 4-CHANNEL RELAYS [ESP32 #3]
+            ARMORED 4-CHANNEL RELAYS [ESP2 DIRECT]
           </h3>
         </div>
         <span className="text-[10px] font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30 font-bold">
-          ISOLATED RELAY COILS
+          ACTIVE LOW (GPIO 4, 15, 18, 5)
         </span>
       </div>
 
@@ -144,8 +144,8 @@ export const RelayPanel: React.FC<RelayPanelProps> = ({
       </div>
 
       <div className="mt-3 text-[10px] font-mono text-slate-500 flex items-center justify-between">
-        <span>Protocol: CMD|RELAY|&lt;1-4&gt;|&lt;ON/OFF&gt;</span>
-        <span className="text-amber-400 font-bold">Hardware Interlock Ready</span>
+        <span>Module 1: IN1 (GPIO4), IN2 (GPIO15) | Module 2: IN1 (GPIO18), IN2 (GPIO5)</span>
+        <span className="text-amber-400 font-bold">Active LOW Logic</span>
       </div>
     </div>
   );

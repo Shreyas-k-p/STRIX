@@ -225,19 +225,24 @@ export function useRover() {
 
   // Parse incoming telemetry packets from ESP2 / ESP1
   const handlePacketReceived = useCallback(
-    (line: string) => {
+    (rawMessage: string) => {
       const now = Date.now();
+      const lines = rawMessage.split(/[\r\n]+/);
 
-      setConnectionState((prev) => ({
-        ...prev,
-        packetsRx: prev.packetsRx + 1,
-        lastPacketRxTimestamp: now,
-        laptopToEsp2Ws: 'CONNECTED',
-        overallStatus: 'CONNECTED',
-      }));
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
 
-      const packet = Protocol.parseLine(line, thresholds);
-      if (!packet) return;
+        setConnectionState((prev) => ({
+          ...prev,
+          packetsRx: prev.packetsRx + 1,
+          lastPacketRxTimestamp: now,
+          laptopToEsp2Ws: 'CONNECTED',
+          overallStatus: 'CONNECTED',
+        }));
+
+        const packet = Protocol.parseLine(trimmed, thresholds);
+        if (!packet) continue;
 
       switch (packet.type) {
         case 'TEMP': {
@@ -439,9 +444,10 @@ export function useRover() {
           addLog('INFO', line, line, 'RAW');
           break;
       }
-    },
-    [thresholds, motorState.speed, updateMotorDetails, addLog]
-  );
+    }
+  },
+  [thresholds, motorState.speed, updateMotorDetails, addLog]
+);
 
   // Serial/WebSocket hook integration
   const serial = useSerial({
@@ -577,41 +583,46 @@ export function useRover() {
     await sendCommand(Protocol.servoStop(), 'SERVO', 'STOP');
   }, [sendCommand]);
 
-  const sendServoCw = useCallback(
+  const sendServoLeft = useCallback(
     async (customSpeed?: number) => {
       const speed = customSpeed ?? (servoState.speed || 65);
       const isInv = servoState.isInverted;
-      const effectiveVal = isInv ? 0 : 180;
+      // Normal: LEFT -> CCW
+      // Inverted: LEFT -> CW
+      const effectiveCmd = isInv ? Protocol.servoCw(speed) : Protocol.servoCcw(speed);
       setServoState((prev) => ({
         ...prev,
-        state: 'CW',
+        state: 'LEFT',
         speed,
-        value: effectiveVal,
-        angle: effectiveVal,
+        value: isInv ? 180 : 0,
+        angle: isInv ? 180 : 0,
       }));
-      const cmd = isInv ? Protocol.servoCcw(speed) : Protocol.servoCw(speed);
-      await sendCommand(cmd, 'SERVO', `CW (${speed}%)`);
+      await sendCommand(effectiveCmd, 'SERVO', `LEFT (${speed}%)`);
     },
     [servoState.speed, servoState.isInverted, sendCommand]
   );
 
-  const sendServoCcw = useCallback(
+  const sendServoRight = useCallback(
     async (customSpeed?: number) => {
       const speed = customSpeed ?? (servoState.speed || 65);
       const isInv = servoState.isInverted;
-      const effectiveVal = isInv ? 180 : 0;
+      // Normal: RIGHT -> CW
+      // Inverted: RIGHT -> CCW
+      const effectiveCmd = isInv ? Protocol.servoCcw(speed) : Protocol.servoCw(speed);
       setServoState((prev) => ({
         ...prev,
-        state: 'CCW',
+        state: 'RIGHT',
         speed,
-        value: effectiveVal,
-        angle: effectiveVal,
+        value: isInv ? 0 : 180,
+        angle: isInv ? 0 : 180,
       }));
-      const cmd = isInv ? Protocol.servoCw(speed) : Protocol.servoCcw(speed);
-      await sendCommand(cmd, 'SERVO', `CCW (${speed}%)`);
+      await sendCommand(effectiveCmd, 'SERVO', `RIGHT (${speed}%)`);
     },
     [servoState.speed, servoState.isInverted, sendCommand]
   );
+
+  const sendServoCw = sendServoRight;
+  const sendServoCcw = sendServoLeft;
 
   const toggleServoInvert = useCallback(() => {
     setServoState((prev) => ({
@@ -759,6 +770,8 @@ export function useRover() {
     emergencyStop,
     toggleRelay,
     sendServoStop,
+    sendServoLeft,
+    sendServoRight,
     sendServoCw,
     sendServoCcw,
     toggleServoInvert,

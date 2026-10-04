@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   RotateCw,
   RotateCcw,
@@ -14,31 +14,34 @@ import { soundFx } from '../utils/audio';
 
 interface ServoPanelProps {
   servoState: ServoState;
+  onSendStop?: () => void;
+  onSendLeft?: (speed?: number) => void;
+  onSendRight?: (speed?: number) => void;
+  onSendCw?: (speed?: number) => void;
+  onSendCcw?: (speed?: number) => void;
+  onToggleInvert?: () => void;
   onSetAngle?: (angle: number) => void;
   onSetSpin?: (speed: number) => void;
   onSetMode?: (mode: any) => void;
   onToggleAutoSweep?: () => void;
   isConnected?: boolean;
-  onSendStop?: () => void;
-  onSendCw?: (speed?: number) => void;
-  onSendCcw?: (speed?: number) => void;
-  onToggleInvert?: () => void;
 }
 
 export const ServoPanel: React.FC<ServoPanelProps> = ({
   servoState,
-  onSetAngle,
-  onSetSpin,
   onSendStop,
+  onSendLeft,
+  onSendRight,
   onSendCw,
   onSendCcw,
   onToggleInvert,
 }) => {
   const [speed, setSpeed] = useState<number>(65);
-  const [isMomentary, setIsMomentary] = useState<boolean>(false);
   const [localInvert, setLocalInvert] = useState<boolean>(servoState.isInverted ?? false);
   const [activeHotkey, setActiveHotkey] = useState<'Q' | 'E' | 'R' | null>(null);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(soundFx.enabled);
+
+  const isHoldingRef = useRef<'LEFT' | 'RIGHT' | null>(null);
 
   // Sync invert state
   useEffect(() => {
@@ -53,46 +56,77 @@ export const ServoPanel: React.FC<ServoPanelProps> = ({
     if (!soundEnabled) soundFx.playKeyClick();
   };
 
-  const handleStop = useCallback(() => {
-    soundFx.playKeyClick();
-    if (onSendStop) {
-      onSendStop();
-    } else if (onSetSpin) {
-      onSetSpin(0);
-    } else if (onSetAngle) {
-      onSetAngle(90);
+  // Trigger continuous rotation LEFT (Normal: CCW | Inverted: CW)
+  const triggerLeftStart = useCallback(() => {
+    isHoldingRef.current = 'LEFT';
+    soundFx.playServoTick();
+    if (onSendLeft) {
+      onSendLeft(speed);
+    } else if (localInvert) {
+      if (onSendCw) onSendCw(speed);
+    } else {
+      if (onSendCcw) onSendCcw(speed);
     }
-  }, [onSendStop, onSetSpin, onSetAngle]);
+  }, [speed, localInvert, onSendLeft, onSendCw, onSendCcw]);
 
-  const handleCw = useCallback(
-    (customSpeed?: number) => {
-      const spd = customSpeed ?? speed;
-      soundFx.playServoTick();
-      if (onSendCw) {
-        onSendCw(spd);
-      } else if (onSetSpin) {
-        onSetSpin(localInvert ? -spd : spd);
-      } else if (onSetAngle) {
-        onSetAngle(localInvert ? 0 : 180);
-      }
-    },
-    [speed, localInvert, onSendCw, onSetSpin, onSetAngle]
-  );
+  // Trigger continuous rotation RIGHT (Normal: CW | Inverted: CCW)
+  const triggerRightStart = useCallback(() => {
+    isHoldingRef.current = 'RIGHT';
+    soundFx.playServoTick();
+    if (onSendRight) {
+      onSendRight(speed);
+    } else if (localInvert) {
+      if (onSendCcw) onSendCcw(speed);
+    } else {
+      if (onSendCw) onSendCw(speed);
+    }
+  }, [speed, localInvert, onSendRight, onSendCw, onSendCcw]);
 
-  const handleCcw = useCallback(
-    (customSpeed?: number) => {
-      const spd = customSpeed ?? speed;
-      soundFx.playServoTick();
-      if (onSendCcw) {
-        onSendCcw(spd);
-      } else if (onSetSpin) {
-        onSetSpin(localInvert ? spd : -spd);
-      } else if (onSetAngle) {
-        onSetAngle(localInvert ? 180 : 0);
-      }
-    },
-    [speed, localInvert, onSendCcw, onSetSpin, onSetAngle]
-  );
+  // Trigger STOP
+  const triggerStop = useCallback(() => {
+    if (isHoldingRef.current !== null) {
+      isHoldingRef.current = null;
+      soundFx.playKeyClick();
+    }
+    if (onSendStop) onSendStop();
+  }, [onSendStop]);
+
+  // Pointer event handlers for Hold-to-Rotate (desktop mouse and touchscreen)
+  const handleLeftPointerDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {}
+    triggerLeftStart();
+  };
+
+  const handleLeftPointerUp = (e: React.PointerEvent) => {
+    e.preventDefault();
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
+    if (isHoldingRef.current === 'LEFT') {
+      triggerStop();
+    }
+  };
+
+  const handleRightPointerDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {}
+    triggerRightStart();
+  };
+
+  const handleRightPointerUp = (e: React.PointerEvent) => {
+    e.preventDefault();
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
+    if (isHoldingRef.current === 'RIGHT') {
+      triggerStop();
+    }
+  };
 
   const handleInvertToggle = useCallback(() => {
     setLocalInvert((prev) => !prev);
@@ -101,23 +135,24 @@ export const ServoPanel: React.FC<ServoPanelProps> = ({
     }
   }, [onToggleInvert]);
 
-  // Keyboard controls: Q = CCW, E = CW, R = STOP
+  // Keyboard controls: Q / ArrowLeft = LEFT (hold), E / ArrowRight = RIGHT (hold), R / Space = STOP
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
         return;
       }
+      if (e.repeat) return; // Ignore key repeat while holding key down
       const k = e.key.toUpperCase();
-      if (k === 'Q') {
+      if (k === 'Q' || k === 'ARROWLEFT') {
         setActiveHotkey('Q');
-        handleCcw();
-      } else if (k === 'E') {
+        triggerLeftStart();
+      } else if (k === 'E' || k === 'ARROWRIGHT') {
         setActiveHotkey('E');
-        handleCw();
-      } else if (k === 'R') {
+        triggerRightStart();
+      } else if (k === 'R' || k === ' ' || k === 'ESCAPE') {
         setActiveHotkey('R');
-        handleStop();
+        triggerStop();
       }
     };
 
@@ -127,11 +162,18 @@ export const ServoPanel: React.FC<ServoPanelProps> = ({
         return;
       }
       const k = e.key.toUpperCase();
-      if (k === 'Q' || k === 'E' || k === 'R') {
+      if (k === 'Q' || k === 'ARROWLEFT') {
         setActiveHotkey(null);
-        if (isMomentary && (k === 'Q' || k === 'E')) {
-          handleStop();
+        if (isHoldingRef.current === 'LEFT') {
+          triggerStop();
         }
+      } else if (k === 'E' || k === 'ARROWRIGHT') {
+        setActiveHotkey(null);
+        if (isHoldingRef.current === 'RIGHT') {
+          triggerStop();
+        }
+      } else if (k === 'R') {
+        setActiveHotkey(null);
       }
     };
 
@@ -141,16 +183,28 @@ export const ServoPanel: React.FC<ServoPanelProps> = ({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [isMomentary, handleCcw, handleCw, handleStop]);
+  }, [triggerLeftStart, triggerRightStart, triggerStop]);
 
   // Determine current active rotation based strictly on active state
-  const isSpinningCw = servoState.state === 'CW';
-  const isSpinningCcw = servoState.state === 'CCW';
-  const isHalted = !isSpinningCw && !isSpinningCcw;
+  const isRotatingLeft =
+    servoState.state === 'LEFT' ||
+    (servoState.state === 'CCW' && !localInvert) ||
+    (servoState.state === 'CW' && localInvert) ||
+    isHoldingRef.current === 'LEFT' ||
+    activeHotkey === 'Q';
+
+  const isRotatingRight =
+    servoState.state === 'RIGHT' ||
+    (servoState.state === 'CW' && !localInvert) ||
+    (servoState.state === 'CCW' && localInvert) ||
+    isHoldingRef.current === 'RIGHT' ||
+    activeHotkey === 'E';
+
+  const isHalted = !isRotatingLeft && !isRotatingRight;
 
   return (
     <div className="hud-panel rounded-xl p-4 shadow-xl flex flex-col justify-between h-full font-mono bg-black/95 border-emerald-500/40">
-      {/* Header */}
+      {/* Header & Status Badge */}
       <div className="flex items-center justify-between border-b border-emerald-500/25 pb-2.5 mb-3">
         <div className="flex items-center gap-2">
           <Compass className="w-4 h-4 text-emerald-400" />
@@ -169,92 +223,100 @@ export const ServoPanel: React.FC<ServoPanelProps> = ({
             {soundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
           </button>
 
-          {/* Current state badge */}
+          {/* Current state badge: HALTED (90), ROTATING LEFT (speed%), ROTATING RIGHT (speed%) */}
           <span
-            className={`text-xs font-mono font-bold px-2 py-0.5 rounded border ${
-              isSpinningCw
-                ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500 animate-pulse shadow-[0_0_10px_rgba(0,255,65,0.4)]'
-                : isSpinningCcw
-                ? 'bg-cyan-950/80 text-cyan-300 border-cyan-500 animate-pulse shadow-[0_0_10px_rgba(0,255,255,0.4)]'
+            className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded border transition-all ${
+              isRotatingLeft
+                ? 'bg-cyan-950/90 text-cyan-300 border-cyan-500 animate-pulse shadow-[0_0_12px_rgba(0,255,255,0.4)]'
+                : isRotatingRight
+                ? 'bg-emerald-950/90 text-emerald-300 border-emerald-500 animate-pulse shadow-[0_0_12px_rgba(0,255,65,0.4)]'
                 : 'bg-slate-950 text-slate-500 border-slate-800'
             }`}
           >
-            {isSpinningCw
-              ? `SPINNING CW (${speed}%)`
-              : isSpinningCcw
-              ? `SPINNING CCW (${speed}%)`
+            {isRotatingLeft
+              ? `ROTATING LEFT (${speed}%)`
+              : isRotatingRight
+              ? `ROTATING RIGHT (${speed}%)`
               : 'HALTED (90)'}
           </span>
         </div>
       </div>
 
-      {/* Main Continuous Rotation Action Grid */}
-      <div className="grid grid-cols-3 gap-3 my-2 flex-1">
-        {/* Rotate CCW Button */}
-        <button
-          onClick={() => handleCcw()}
-          onMouseDown={() => {
-            if (isMomentary) handleCcw();
-          }}
-          onMouseUp={() => {
-            if (isMomentary) handleStop();
-          }}
-          className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all text-center select-none ${
-            isSpinningCcw || activeHotkey === 'Q'
-              ? 'bg-cyan-950/80 border-cyan-400 text-cyan-200 shadow-[0_0_20px_rgba(0,255,255,0.5)] scale-[0.98]'
-              : 'bg-slate-950/80 border-slate-800 hover:border-cyan-500/50 hover:bg-cyan-950/20 text-slate-300'
-          }`}
-          title="Rotate Counter-Clockwise (Hotkey: Q)"
-        >
-          <RotateCcw
-            className={`w-7 h-7 mb-2 ${
-              isSpinningCcw ? 'animate-spin text-cyan-400' : 'text-cyan-400/80'
-            }`}
-          />
-          <span className="text-xs font-black font-mono tracking-wider">ROTATE CCW</span>
-          <span className="text-[10px] text-slate-400 font-mono mt-1">[HOTKEY: Q] &bull; 0</span>
-        </button>
-
-        {/* STOP / Halt Button */}
-        <button
-          onClick={handleStop}
-          className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all text-center select-none ${
-            isHalted || activeHotkey === 'R'
-              ? 'bg-rose-950/40 border-rose-500/60 text-rose-300 shadow-[0_0_15px_rgba(255,0,51,0.3)]'
-              : 'bg-slate-950/80 border-slate-800 hover:border-rose-500/50 hover:bg-rose-950/20 text-slate-300'
-          }`}
-          title="Stop Continuous Rotation / Halt (Hotkey: R)"
-        >
-          <Square className="w-7 h-7 mb-2 text-rose-500 fill-current" />
-          <span className="text-xs font-black font-mono tracking-wider text-rose-400">
-            HALT / STOP
+      {/* DEDICATED MANUAL CONTINUOUS SERVO CONTROL SECTION */}
+      <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80 space-y-2.5 my-1 flex-1 flex flex-col justify-center">
+        <div className="flex items-center justify-between border-b border-slate-800/60 pb-1.5">
+          <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider font-mono">
+            MANUAL SERVO
           </span>
-          <span className="text-[10px] text-slate-400 font-mono mt-1">[HOTKEY: R] &bull; 90</span>
-        </button>
+          <span className="text-[10px] text-slate-500 font-mono">
+            HOLD TO ROTATE &bull; Q / E / R
+          </span>
+        </div>
 
-        {/* Rotate CW Button */}
-        <button
-          onClick={() => handleCw()}
-          onMouseDown={() => {
-            if (isMomentary) handleCw();
-          }}
-          onMouseUp={() => {
-            if (isMomentary) handleStop();
-          }}
-          className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all text-center select-none ${
-            isSpinningCw || activeHotkey === 'E'
-              ? 'bg-emerald-950/80 border-emerald-400 text-emerald-200 shadow-[0_0_20px_rgba(0,255,65,0.5)] scale-[0.98]'
-              : 'bg-slate-950/80 border-slate-800 hover:border-emerald-500/50 hover:bg-emerald-950/20 text-slate-300'
-          }`}
-          title="Rotate Clockwise (Hotkey: E)"
-        >
-          <RotateCw
-            className={`w-7 h-7 mb-2 ${
-              isSpinningCw ? 'animate-spin text-emerald-400' : 'text-emerald-400/80'
+        {/* 2 Large Buttons: [ ◀ LEFT ] [ RIGHT ▶ ] */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* LEFT BUTTON */}
+          <button
+            onPointerDown={handleLeftPointerDown}
+            onPointerUp={handleLeftPointerUp}
+            onPointerCancel={handleLeftPointerUp}
+            onPointerLeave={handleLeftPointerUp}
+            className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all text-center select-none cursor-pointer touch-none ${
+              isRotatingLeft
+                ? 'bg-cyan-950 border-cyan-400 text-cyan-200 shadow-[0_0_25px_rgba(0,255,255,0.6)] scale-[0.98]'
+                : 'bg-slate-950/90 border-slate-800 hover:border-cyan-500/60 hover:bg-cyan-950/30 text-slate-200'
             }`}
-          />
-          <span className="text-xs font-black font-mono tracking-wider">ROTATE CW</span>
-          <span className="text-[10px] text-slate-400 font-mono mt-1">[HOTKEY: E] &bull; 180</span>
+            title="Hold to rotate Left (Hotkey: Q / ◀)"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <RotateCcw className={`w-6 h-6 ${isRotatingLeft ? 'animate-spin text-cyan-400' : 'text-cyan-400'}`} />
+              <span className="text-sm font-black font-mono tracking-wider">◀ LEFT</span>
+            </div>
+            <span className="text-[10px] text-slate-400 font-mono">
+              {localInvert ? 'CW (INVERTED)' : 'CCW'} &bull; {speed}%
+            </span>
+          </button>
+
+          {/* RIGHT BUTTON */}
+          <button
+            onPointerDown={handleRightPointerDown}
+            onPointerUp={handleRightPointerUp}
+            onPointerCancel={handleRightPointerUp}
+            onPointerLeave={handleRightPointerUp}
+            className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all text-center select-none cursor-pointer touch-none ${
+              isRotatingRight
+                ? 'bg-emerald-950 border-emerald-400 text-emerald-200 shadow-[0_0_25px_rgba(0,255,65,0.6)] scale-[0.98]'
+                : 'bg-slate-950/90 border-slate-800 hover:border-emerald-500/60 hover:bg-emerald-950/30 text-slate-200'
+            }`}
+            title="Hold to rotate Right (Hotkey: E / ▶)"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-sm font-black font-mono tracking-wider">RIGHT ▶</span>
+              <RotateCw className={`w-6 h-6 ${isRotatingRight ? 'animate-spin text-emerald-400' : 'text-emerald-400'}`} />
+            </div>
+            <span className="text-[10px] text-slate-400 font-mono">
+              {localInvert ? 'CCW (INVERTED)' : 'CW'} &bull; {speed}%
+            </span>
+          </button>
+        </div>
+
+        {/* STOP BUTTON: [ STOP ] */}
+        <button
+          onClick={triggerStop}
+          className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl border transition-all select-none cursor-pointer font-mono ${
+            isHalted
+              ? 'bg-rose-950/30 border-rose-500/40 text-rose-300 hover:bg-rose-950/60'
+              : 'bg-rose-900 border-rose-400 text-white shadow-[0_0_20px_rgba(255,0,51,0.5)] animate-pulse'
+          }`}
+          title="Stop rotation / Neutral 90 (Hotkey: R / Space)"
+        >
+          <Square className="w-5 h-5 text-rose-500 fill-current" />
+          <span className="text-xs font-black tracking-wider">
+            [ STOP ]
+          </span>
+          <span className="text-[10px] text-rose-400/80 ml-1">
+            (90 HALT)
+          </span>
         </button>
       </div>
 
@@ -301,39 +363,32 @@ export const ServoPanel: React.FC<ServoPanelProps> = ({
         </div>
       </div>
 
-      {/* Configuration & Options (Invert & Momentary) */}
-      <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-slate-800/80 text-[11px] font-mono">
-        {/* Direction Invert Toggle */}
+      {/* Direction Invert Toggle */}
+      <div className="mt-2 pt-2 border-t border-slate-800/80">
         <button
           onClick={handleInvertToggle}
-          className={`flex items-center justify-center gap-1.5 p-2 rounded-lg border transition-all ${
+          className={`w-full flex items-center justify-between p-2.5 rounded-lg border transition-all ${
             localInvert
               ? 'bg-amber-950/80 border-amber-500 text-amber-300'
               : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
           }`}
           title="Invert physical rotation direction if servo wiring or horn is reversed"
         >
-          <ArrowLeftRight className="w-3.5 h-3.5 text-amber-400" />
-          <span>DIR INVERT: {localInvert ? 'ON (REVERSED)' : 'OFF (NORMAL)'}</span>
-        </button>
-
-        {/* Momentary vs Latched Switch */}
-        <button
-          onClick={() => setIsMomentary(!isMomentary)}
-          className={`flex items-center justify-center gap-1.5 p-2 rounded-lg border transition-all ${
-            isMomentary
-              ? 'bg-cyan-950/80 border-cyan-500 text-cyan-300'
-              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
-          }`}
-          title="Toggle between Hold-to-Spin and Latched toggle"
-        >
-          <span>MODE: {isMomentary ? 'HOLD TO ROTATE' : 'LATCHED (TOGGLE)'}</span>
+          <div className="flex items-center gap-2">
+            <ArrowLeftRight className="w-4 h-4 text-amber-400" />
+            <span className="font-bold text-xs">
+              DIR INVERT: {localInvert ? 'ON (REVERSED)' : 'OFF (NORMAL)'}
+            </span>
+          </div>
+          <span className="text-[10px] text-slate-400">
+            {localInvert ? 'LEFT=CW, RIGHT=CCW' : 'LEFT=CCW, RIGHT=CW'}
+          </span>
         </button>
       </div>
 
       {/* Footer Hardware Info */}
-      <div className="mt-3 text-[10px] font-mono text-slate-500 bg-slate-950 p-2 rounded border border-slate-900">
-        ⚙️ <span className="text-emerald-400 font-bold">CONTINUOUS SERVO LOGIC:</span> Value 90 = STOP, 180 = CW, 0 = CCW. Commands: CMD|SERVO|CW|&lt;spd&gt;, CMD|SERVO|CCW|&lt;spd&gt;, CMD|SERVO|STOP.
+      <div className="mt-2.5 text-[10px] font-mono text-slate-500 bg-slate-950 p-2 rounded border border-slate-900">
+        ⚙️ <span className="text-emerald-400 font-bold">CONTINUOUS SERVO LOGIC:</span> Value 90 = STOP, 180 = CW, 0 = CCW. Commands: CMD|SERVO|CCW|&lt;spd&gt;, CMD|SERVO|CW|&lt;spd&gt;, CMD|SERVO|STOP.
       </div>
     </div>
   );

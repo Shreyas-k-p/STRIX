@@ -39,6 +39,8 @@ export function App() {
     emergencyStop,
     toggleRelay,
     sendServoStop,
+    sendServoLeft,
+    sendServoRight,
     sendServoCw,
     sendServoCcw,
     toggleServoInvert,
@@ -215,6 +217,8 @@ export function App() {
             <ServoPanel
               servoState={servoState}
               onSendStop={sendServoStop}
+              onSendLeft={sendServoLeft}
+              onSendRight={sendServoRight}
               onSendCw={sendServoCw}
               onSendCcw={sendServoCcw}
               onToggleInvert={toggleServoInvert}

@@ -155,8 +155,19 @@ export const Protocol = {
 
         if (sensorType === 'IR') {
           const val = (rawVal || '').trim().toUpperCase();
-          const isObstacle =
-            val === 'OBSTACLE' || val === '1' || val === 'DETECTED' || val === 'TRUE';
+          let isObstacle: boolean | null = null;
+          if (val === 'CLEAR' || val.includes('CLEAR')) {
+            isObstacle = false;
+          } else if (val === 'OBSTACLE' || val.includes('OBSTACLE')) {
+            isObstacle = true;
+          } else if (val === '0' || val === 'LOW') {
+            isObstacle = true;
+          } else if (val === '1' || val === 'HIGH') {
+            isObstacle = false;
+          }
+
+          if (isObstacle === null) return null;
+
           return {
             type: 'IR',
             raw: trimmed,
@@ -196,9 +207,16 @@ export const Protocol = {
             const val = parseFloat(v);
             if (!isNaN(val)) dist = Math.max(0, val);
           } else if (k === 'IR') {
-            const vUp = v.toUpperCase();
-            irObstacle =
-              vUp === 'OBSTACLE' || vUp === '1' || vUp === 'DETECTED' || vUp === 'TRUE';
+            const vClean = v.trim().toUpperCase();
+            if (vClean === 'CLEAR' || vClean.includes('CLEAR')) {
+              irObstacle = false;
+            } else if (vClean === 'OBSTACLE' || vClean.includes('OBSTACLE')) {
+              irObstacle = true;
+            } else if (vClean === '0' || vClean === 'LOW') {
+              irObstacle = true;
+            } else if (vClean === '1' || vClean === 'HIGH') {
+              irObstacle = false;
+            }
           }
         }
 
@@ -280,8 +298,13 @@ export const Protocol = {
         }
 
         if (sensorType === 'IR') {
-          const status = parts[2]?.toUpperCase();
-          const isObstacle = status === 'OBSTACLE' || status === '1' || status === 'DETECTED';
+          const status = (parts[2] || '').trim().toUpperCase();
+          let isObstacle = false;
+          if (status === 'CLEAR' || status.includes('CLEAR')) {
+            isObstacle = false;
+          } else if (status === 'OBSTACLE' || status.includes('OBSTACLE') || status === '0') {
+            isObstacle = true;
+          }
           return {
             type: 'IR',
             raw: trimmed,

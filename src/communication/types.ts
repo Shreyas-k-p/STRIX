@@ -51,7 +51,7 @@ export interface RelayState {
 }
 
 export interface ServoState {
-  state: 'STOP' | 'CW' | 'CCW';
+  state: 'STOP' | 'CW' | 'CCW' | 'LEFT' | 'RIGHT';
   speed: number; // 0 to 100%
   value: number; // 90 = STOP, 180 = CW, 0 = CCW
   isInverted: boolean; // physical direction reversal toggle

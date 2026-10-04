@@ -179,10 +179,6 @@ export function App() {
               onSpeedChange={setMotorSpeed}
               onEmergencyStop={emergencyStop}
               isConnected={serial.isConnected}
-              servoState={servoState}
-              onServoLeft={sendServoLeft}
-              onServoRight={sendServoRight}
-              onServoStop={sendServoStop}
             />
           </div>
 

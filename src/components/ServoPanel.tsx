@@ -8,6 +8,8 @@ import {
   VolumeX,
   Compass,
   ArrowLeftRight,
+  Crosshair,
+  Gamepad2,
 } from 'lucide-react';
 import type { ServoState } from '../communication/types';
 import { soundFx } from '../utils/audio';
@@ -40,6 +42,12 @@ export const ServoPanel: React.FC<ServoPanelProps> = ({
   const [localInvert, setLocalInvert] = useState<boolean>(servoState.isInverted ?? false);
   const [activeHotkey, setActiveHotkey] = useState<'Q' | 'E' | 'R' | null>(null);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(soundFx.enabled);
+  const [controlMode, setControlMode] = useState<'JOYSTICK' | 'BUTTONS' | 'BOTH'>('JOYSTICK');
+
+  // Virtual spring-loaded joystick state
+  const joystickBaseRef = useRef<HTMLDivElement>(null);
+  const [knobPos, setKnobPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState<boolean>(false);
 
   const isHoldingRef = useRef<'LEFT' | 'RIGHT' | null>(null);
 
@@ -91,12 +99,73 @@ export const ServoPanel: React.FC<ServoPanelProps> = ({
     if (onSendStop) onSendStop();
   }, [onSendStop]);
 
-  // Pointer event handlers for Hold-to-Rotate (desktop mouse and touchscreen)
+  // Joystick pointer dragging logic
+  const maxR = 48; // Max deflection radius in pixels
+  const deadZone = 12;
+
+  const handleJoystickPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {}
+    setIsDragging(true);
+    updateJoystickFromPointer(e.clientX, e.clientY);
+  };
+
+  const updateJoystickFromPointer = (clientX: number, clientY: number) => {
+    if (!joystickBaseRef.current) return;
+    const rect = joystickBaseRef.current.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+
+    let dx = clientX - centerX;
+    let dy = clientY - centerY;
+
+    const distance = Math.hypot(dx, dy);
+    if (distance > maxR) {
+      dx = (dx / distance) * maxR;
+      dy = (dy / distance) * maxR;
+    }
+
+    setKnobPos({ x: dx, y: dy });
+
+    if (dx < -deadZone) {
+      if (isHoldingRef.current !== 'LEFT') {
+        triggerLeftStart();
+      }
+    } else if (dx > deadZone) {
+      if (isHoldingRef.current !== 'RIGHT') {
+        triggerRightStart();
+      }
+    } else {
+      if (isHoldingRef.current !== null) {
+        triggerStop();
+      }
+    }
+  };
+
+  const handleJoystickPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+    updateJoystickFromPointer(e.clientX, e.clientY);
+  };
+
+  const handleJoystickPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
+    setIsDragging(false);
+    setKnobPos({ x: 0, y: 0 });
+    triggerStop();
+  };
+
+  // Pointer event handlers for Hold-to-Rotate Buttons (desktop mouse and touchscreen)
   const handleLeftPointerDown = (e: React.PointerEvent) => {
     e.preventDefault();
     try {
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     } catch {}
+    setKnobPos({ x: -38, y: 0 });
     triggerLeftStart();
   };
 
@@ -105,6 +174,7 @@ export const ServoPanel: React.FC<ServoPanelProps> = ({
     try {
       (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
     } catch {}
+    setKnobPos({ x: 0, y: 0 });
     if (isHoldingRef.current === 'LEFT') {
       triggerStop();
     }
@@ -115,6 +185,7 @@ export const ServoPanel: React.FC<ServoPanelProps> = ({
     try {
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     } catch {}
+    setKnobPos({ x: 38, y: 0 });
     triggerRightStart();
   };
 
@@ -123,6 +194,7 @@ export const ServoPanel: React.FC<ServoPanelProps> = ({
     try {
       (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
     } catch {}
+    setKnobPos({ x: 0, y: 0 });
     if (isHoldingRef.current === 'RIGHT') {
       triggerStop();
     }
@@ -142,16 +214,19 @@ export const ServoPanel: React.FC<ServoPanelProps> = ({
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
         return;
       }
-      if (e.repeat) return; // Ignore key repeat while holding key down
+      if (e.repeat) return;
       const k = e.key.toUpperCase();
       if (k === 'Q' || k === 'ARROWLEFT') {
         setActiveHotkey('Q');
+        setKnobPos({ x: -38, y: 0 });
         triggerLeftStart();
       } else if (k === 'E' || k === 'ARROWRIGHT') {
         setActiveHotkey('E');
+        setKnobPos({ x: 38, y: 0 });
         triggerRightStart();
       } else if (k === 'R' || k === ' ' || k === 'ESCAPE') {
         setActiveHotkey('R');
+        setKnobPos({ x: 0, y: 0 });
         triggerStop();
       }
     };
@@ -164,11 +239,13 @@ export const ServoPanel: React.FC<ServoPanelProps> = ({
       const k = e.key.toUpperCase();
       if (k === 'Q' || k === 'ARROWLEFT') {
         setActiveHotkey(null);
+        setKnobPos({ x: 0, y: 0 });
         if (isHoldingRef.current === 'LEFT') {
           triggerStop();
         }
       } else if (k === 'E' || k === 'ARROWRIGHT') {
         setActiveHotkey(null);
+        setKnobPos({ x: 0, y: 0 });
         if (isHoldingRef.current === 'RIGHT') {
           triggerStop();
         }
@@ -201,11 +278,12 @@ export const ServoPanel: React.FC<ServoPanelProps> = ({
     activeHotkey === 'E';
 
   const isHalted = !isRotatingLeft && !isRotatingRight;
+  const deflectionPct = Math.round((knobPos.x / maxR) * 100);
 
   return (
     <div className="hud-panel rounded-xl p-4 shadow-xl flex flex-col justify-between h-full font-mono bg-black/95 border-emerald-500/40">
       {/* Header & Status Badge */}
-      <div className="flex items-center justify-between border-b border-emerald-500/25 pb-2.5 mb-3">
+      <div className="flex items-center justify-between border-b border-emerald-500/25 pb-2.5 mb-2">
         <div className="flex items-center gap-2">
           <Compass className="w-4 h-4 text-emerald-400" />
           <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-200 font-heading">
@@ -242,75 +320,218 @@ export const ServoPanel: React.FC<ServoPanelProps> = ({
         </div>
       </div>
 
-      {/* DEDICATED MANUAL CONTINUOUS SERVO CONTROL SECTION */}
-      <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80 space-y-2.5 my-1 flex-1 flex flex-col justify-center">
+      {/* DEDICATED SERVO CONTROL BOX */}
+      <div className="bg-slate-950/70 p-3 rounded-xl border border-slate-800/80 space-y-2.5 my-1 flex-1 flex flex-col justify-between">
+        {/* Section title & mode switcher */}
         <div className="flex items-center justify-between border-b border-slate-800/60 pb-1.5">
-          <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider font-mono">
-            MANUAL SERVO
+          <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+            <Gamepad2 className="w-3.5 h-3.5 text-cyan-400" />
+            <span>MANUAL SERVO CONTROL</span>
           </span>
-          <span className="text-[10px] text-slate-500 font-mono">
-            HOLD TO ROTATE &bull; Q / E / R
-          </span>
+
+          {/* Selector pills: JOYSTICK / BUTTONS / BOTH */}
+          <div className="flex items-center bg-black/80 rounded-lg p-0.5 border border-slate-800 text-[10px]">
+            <button
+              onClick={() => setControlMode('JOYSTICK')}
+              className={`px-2 py-0.5 rounded font-bold transition-all ${
+                controlMode === 'JOYSTICK'
+                  ? 'bg-cyan-500 text-black shadow-[0_0_10px_rgba(0,255,255,0.5)]'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              🕹️ JOYSTICK
+            </button>
+            <button
+              onClick={() => setControlMode('BUTTONS')}
+              className={`px-2 py-0.5 rounded font-bold transition-all ${
+                controlMode === 'BUTTONS'
+                  ? 'bg-emerald-500 text-black shadow-[0_0_10px_rgba(0,255,65,0.5)]'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              ◀ ▶ BUTTONS
+            </button>
+            <button
+              onClick={() => setControlMode('BOTH')}
+              className={`px-2 py-0.5 rounded font-bold transition-all ${
+                controlMode === 'BOTH'
+                  ? 'bg-amber-400 text-black shadow-[0_0_10px_rgba(251,191,36,0.5)]'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              ⚡ BOTH
+            </button>
+          </div>
         </div>
 
-        {/* 2 Large Buttons: [ ◀ LEFT ] [ RIGHT ▶ ] */}
-        <div className="grid grid-cols-2 gap-3">
-          {/* LEFT BUTTON */}
-          <button
-            onPointerDown={handleLeftPointerDown}
-            onPointerUp={handleLeftPointerUp}
-            onPointerCancel={handleLeftPointerUp}
-            onPointerLeave={handleLeftPointerUp}
-            className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all text-center select-none cursor-pointer touch-none ${
-              isRotatingLeft
-                ? 'bg-cyan-950 border-cyan-400 text-cyan-200 shadow-[0_0_25px_rgba(0,255,255,0.6)] scale-[0.98]'
-                : 'bg-slate-950/90 border-slate-800 hover:border-cyan-500/60 hover:bg-cyan-950/30 text-slate-200'
-            }`}
-            title="Hold to rotate Left (Hotkey: Q / ◀)"
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <RotateCcw className={`w-6 h-6 ${isRotatingLeft ? 'animate-spin text-cyan-400' : 'text-cyan-400'}`} />
-              <span className="text-sm font-black font-mono tracking-wider">◀ LEFT</span>
+        {/* 1. SPRING-LOADED VIRTUAL JOYSTICK (Visible in JOYSTICK and BOTH mode) */}
+        {(controlMode === 'JOYSTICK' || controlMode === 'BOTH') && (
+          <div className="flex flex-col items-center justify-center py-1">
+            <div className="w-full flex items-center justify-between text-[10px] text-slate-400 px-2 mb-1">
+              <span className={`font-mono font-bold transition-colors ${isRotatingLeft ? 'text-cyan-300' : 'text-slate-500'}`}>
+                ◀ CCW ({localInvert ? 'REV' : 'NORM'})
+              </span>
+              <span className="font-mono text-[9px] text-slate-500">
+                DRAG OR USE Q / E • SPRINGS TO STOP
+              </span>
+              <span className={`font-mono font-bold transition-colors ${isRotatingRight ? 'text-emerald-300' : 'text-slate-500'}`}>
+                CW ({localInvert ? 'REV' : 'NORM'}) ▶
+              </span>
             </div>
-            <span className="text-[10px] text-slate-400 font-mono">
-              {localInvert ? 'CW (INVERTED)' : 'CCW'} &bull; {speed}%
-            </span>
-          </button>
 
-          {/* RIGHT BUTTON */}
-          <button
-            onPointerDown={handleRightPointerDown}
-            onPointerUp={handleRightPointerUp}
-            onPointerCancel={handleRightPointerUp}
-            onPointerLeave={handleRightPointerUp}
-            className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all text-center select-none cursor-pointer touch-none ${
-              isRotatingRight
-                ? 'bg-emerald-950 border-emerald-400 text-emerald-200 shadow-[0_0_25px_rgba(0,255,65,0.6)] scale-[0.98]'
-                : 'bg-slate-950/90 border-slate-800 hover:border-emerald-500/60 hover:bg-emerald-950/30 text-slate-200'
-            }`}
-            title="Hold to rotate Right (Hotkey: E / ▶)"
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-sm font-black font-mono tracking-wider">RIGHT ▶</span>
-              <RotateCw className={`w-6 h-6 ${isRotatingRight ? 'animate-spin text-emerald-400' : 'text-emerald-400'}`} />
+            {/* Circular Joystick Field with concentric guide rings */}
+            <div
+              ref={joystickBaseRef}
+              onPointerDown={handleJoystickPointerDown}
+              onPointerMove={handleJoystickPointerMove}
+              onPointerUp={handleJoystickPointerUp}
+              onPointerCancel={handleJoystickPointerUp}
+              className="relative w-44 h-28 sm:h-32 rounded-2xl bg-gradient-to-b from-slate-950 via-slate-900 to-black border-2 border-slate-700 hover:border-cyan-500/60 shadow-[inset_0_0_20px_rgba(0,0,0,0.9)] flex items-center justify-center cursor-grab active:cursor-grabbing select-none touch-none overflow-hidden"
+              title="Click & Drag Left or Right to rotate servo. Release to STOP."
+            >
+              {/* Concentric guidance rings & grid */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-25">
+                <div className="w-36 h-20 rounded-full border border-dashed border-cyan-400" />
+                <div className="absolute w-24 h-14 rounded-full border border-slate-500" />
+                <div className="absolute h-full w-[1px] bg-slate-700" />
+                <div className="absolute w-full h-[1px] bg-slate-700" />
+              </div>
+
+              {/* Horizontal guide track */}
+              <div className="absolute w-36 h-1.5 bg-slate-800 rounded-full overflow-hidden pointer-events-none flex">
+                <div
+                  className="h-full bg-cyan-400 transition-all ml-auto"
+                  style={{ width: knobPos.x < 0 ? `${(Math.abs(knobPos.x) / maxR) * 50}%` : '0%' }}
+                />
+                <div
+                  className="h-full bg-emerald-400 transition-all mr-auto"
+                  style={{ width: knobPos.x > 0 ? `${(knobPos.x / maxR) * 50}%` : '0%' }}
+                />
+              </div>
+
+              {/* Directional labels inside base */}
+              <div className="absolute left-3 text-[10px] font-black text-cyan-400/80 pointer-events-none flex items-center gap-0.5">
+                <RotateCcw className="w-3 h-3" />
+                <span>LEFT</span>
+              </div>
+              <div className="absolute right-3 text-[10px] font-black text-emerald-400/80 pointer-events-none flex items-center gap-0.5">
+                <span>RIGHT</span>
+                <RotateCw className="w-3 h-3" />
+              </div>
+
+              {/* Draggable Spring Thumbstick Knob */}
+              <div
+                className={`relative w-14 h-14 rounded-full shadow-2xl flex items-center justify-center border-2 pointer-events-none transition-shadow ${
+                  isRotatingLeft
+                    ? 'bg-gradient-to-tr from-cyan-900 to-cyan-600 border-cyan-300 shadow-[0_0_20px_rgba(0,255,255,0.8)]'
+                    : isRotatingRight
+                    ? 'bg-gradient-to-tr from-emerald-900 to-emerald-600 border-emerald-300 shadow-[0_0_20px_rgba(0,255,65,0.8)]'
+                    : 'bg-gradient-to-tr from-slate-900 via-slate-800 to-slate-700 border-slate-500'
+                }`}
+                style={{
+                  transform: `translate(${knobPos.x}px, ${knobPos.y}px)`,
+                  transition: isDragging ? 'none' : 'transform 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                }}
+              >
+                {/* Center crosshair on knob */}
+                <Crosshair
+                  className={`w-6 h-6 transition-all ${
+                    isRotatingLeft
+                      ? 'text-cyan-200 rotate-[-45deg]'
+                      : isRotatingRight
+                      ? 'text-emerald-200 rotate-45'
+                      : 'text-slate-400'
+                  }`}
+                />
+                {/* Tactile thumb ring */}
+                <div className="absolute inset-1.5 rounded-full border border-white/20 pointer-events-none" />
+              </div>
             </div>
-            <span className="text-[10px] text-slate-400 font-mono">
-              {localInvert ? 'CCW (INVERTED)' : 'CW'} &bull; {speed}%
-            </span>
-          </button>
-        </div>
 
-        {/* STOP BUTTON: [ STOP ] */}
+            {/* Real-time deflection & action readout */}
+            <div className="w-full flex items-center justify-between text-[11px] font-mono mt-1 px-1">
+              <span className="text-slate-400 text-[10px]">
+                DEFLECTION: <strong className={isRotatingLeft ? 'text-cyan-300' : isRotatingRight ? 'text-emerald-300' : 'text-slate-400'}>{deflectionPct > 0 ? `+${deflectionPct}%` : `${deflectionPct}%`}</strong>
+              </span>
+              <span
+                className={`text-[10px] font-black px-2 py-0.5 rounded transition-colors ${
+                  isRotatingLeft
+                    ? 'bg-cyan-950 text-cyan-300 border border-cyan-500/50'
+                    : isRotatingRight
+                    ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/50'
+                    : 'bg-slate-900 text-slate-500 border border-slate-800'
+                }`}
+              >
+                {isRotatingLeft
+                  ? `◄ ROTATING LEFT (${speed}%)`
+                  : isRotatingRight
+                  ? `ROTATING RIGHT (${speed}%) ▶`
+                  : '● NEUTRAL (90 HALT)'}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* 2. HOLD BUTTONS (Visible in BUTTONS and BOTH mode) */}
+        {(controlMode === 'BUTTONS' || controlMode === 'BOTH') && (
+          <div className="grid grid-cols-2 gap-3">
+            {/* LEFT BUTTON */}
+            <button
+              onPointerDown={handleLeftPointerDown}
+              onPointerUp={handleLeftPointerUp}
+              onPointerCancel={handleLeftPointerUp}
+              onPointerLeave={handleLeftPointerUp}
+              className={`flex flex-col items-center justify-center p-3 rounded-xl border transition-all text-center select-none cursor-pointer touch-none ${
+                isRotatingLeft
+                  ? 'bg-cyan-950 border-cyan-400 text-cyan-200 shadow-[0_0_20px_rgba(0,255,255,0.6)] scale-[0.98]'
+                  : 'bg-slate-950/90 border-slate-800 hover:border-cyan-500/60 hover:bg-cyan-950/30 text-slate-200'
+              }`}
+              title="Hold to rotate Left (Hotkey: Q / ◀)"
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <RotateCcw className={`w-5 h-5 ${isRotatingLeft ? 'animate-spin text-cyan-400' : 'text-cyan-400'}`} />
+                <span className="text-xs sm:text-sm font-black font-mono tracking-wider">◀ LEFT</span>
+              </div>
+              <span className="text-[10px] text-slate-400 font-mono">
+                {localInvert ? 'CW (INVERTED)' : 'CCW'} &bull; {speed}%
+              </span>
+            </button>
+
+            {/* RIGHT BUTTON */}
+            <button
+              onPointerDown={handleRightPointerDown}
+              onPointerUp={handleRightPointerUp}
+              onPointerCancel={handleRightPointerUp}
+              onPointerLeave={handleRightPointerUp}
+              className={`flex flex-col items-center justify-center p-3 rounded-xl border transition-all text-center select-none cursor-pointer touch-none ${
+                isRotatingRight
+                  ? 'bg-emerald-950 border-emerald-400 text-emerald-200 shadow-[0_0_20px_rgba(0,255,65,0.6)] scale-[0.98]'
+                  : 'bg-slate-950/90 border-slate-800 hover:border-emerald-500/60 hover:bg-emerald-950/30 text-slate-200'
+              }`}
+              title="Hold to rotate Right (Hotkey: E / ▶)"
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs sm:text-sm font-black font-mono tracking-wider">RIGHT ▶</span>
+                <RotateCw className={`w-5 h-5 ${isRotatingRight ? 'animate-spin text-emerald-400' : 'text-emerald-400'}`} />
+              </div>
+              <span className="text-[10px] text-slate-400 font-mono">
+                {localInvert ? 'CCW (INVERTED)' : 'CW'} &bull; {speed}%
+              </span>
+            </button>
+          </div>
+        )}
+
+        {/* STOP BUTTON: [ STOP ] (Always present for instant safety) */}
         <button
           onClick={triggerStop}
-          className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl border transition-all select-none cursor-pointer font-mono ${
+          className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border transition-all select-none cursor-pointer font-mono ${
             isHalted
               ? 'bg-rose-950/30 border-rose-500/40 text-rose-300 hover:bg-rose-950/60'
               : 'bg-rose-900 border-rose-400 text-white shadow-[0_0_20px_rgba(255,0,51,0.5)] animate-pulse'
           }`}
           title="Stop rotation / Neutral 90 (Hotkey: R / Space)"
         >
-          <Square className="w-5 h-5 text-rose-500 fill-current" />
+          <Square className="w-4 h-4 text-rose-500 fill-current" />
           <span className="text-xs font-black tracking-wider">
             [ STOP ]
           </span>

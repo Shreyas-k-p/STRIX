@@ -150,6 +150,7 @@ export class WebSocketManager {
     }
 
     try {
+      console.log(`WS TX: ${data.trim()}`);
       this.socket.send(data);
       return true;
     } catch (error) {

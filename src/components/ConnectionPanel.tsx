@@ -51,7 +51,7 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ connection }) 
     },
     {
       title: 'ESP2 ↔ ESP1 UART Bus',
-      sub: 'Sensors: DHT11 (33), MQ135 (34), HC-SR04 (21/35) & Servo (32)',
+      sub: 'Sensors: DHT11 (33), MQ135 (34), HC-SR04 (21/35), IR (27) & Servo (32) via UART (TX2:17, RX2:16)',
       status: connection.esp2ToEsp1Uart,
       icon: <Layers className="w-4 h-4 text-amber-400" />,
     },

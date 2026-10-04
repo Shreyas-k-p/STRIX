@@ -328,20 +328,20 @@ export const SensorDashboard: React.FC<SensorDashboardProps> = ({
           </div>
         </div>
 
-        {/* Card 4: IR Perimeter Sensor */}
+        {/* Card 4: IR Obstacle Sensor */}
         <div className="bg-slate-950/90 rounded-xl border border-amber-500/20 p-3.5 flex flex-col justify-between shadow-inner">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
               <AlertOctagon className="w-4 h-4 text-amber-400" />
-              <span>IR PERIMETER BREACH</span>
+              <span>IR OBSTACLE SENSOR</span>
             </div>
-            <span className="text-[10px] font-mono text-slate-500 font-bold">INFRARED LINE</span>
+            <span className="text-[10px] font-mono text-slate-500 font-bold">ESP1 GPIO27</span>
           </div>
 
           <div className="flex flex-col items-center justify-center py-3">
             {sensorData.irObstacle !== null ? (
               <div
-                className={`flex items-center gap-2 px-4 py-2 rounded border text-xs font-black font-mono tracking-wider shadow-lg ${
+                className={`flex items-center gap-2 px-4 py-2 rounded border text-sm font-black font-mono tracking-wider shadow-lg ${
                   sensorData.irObstacle
                     ? 'bg-rose-950 text-rose-300 border-rose-500 ring-2 ring-rose-500 animate-pulse'
                     : 'bg-emerald-950/60 text-emerald-300 border-emerald-500'
@@ -350,12 +350,12 @@ export const SensorDashboard: React.FC<SensorDashboardProps> = ({
                 {sensorData.irObstacle ? (
                   <>
                     <ShieldAlert className="w-4 h-4 text-rose-400" />
-                    <span>PERIMETER TRIPPED</span>
+                    <span>OBSTACLE</span>
                   </>
                 ) : (
                   <>
                     <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                    <span>CORRIDOR CLEAR</span>
+                    <span>CLEAR</span>
                   </>
                 )}
               </div>
@@ -365,7 +365,7 @@ export const SensorDashboard: React.FC<SensorDashboardProps> = ({
           </div>
 
           <div className="text-[9px] font-mono text-slate-500 text-right mt-1">
-            SUBSYSTEM: {isConnected ? 'ARMED' : 'STANDBY'}
+            STATUS: {sensorData.irObstacle !== null ? (sensorData.irObstacle ? 'OBSTACLE DETECTED' : 'CLEAR') : (isConnected ? 'ACTIVE' : 'NO DATA')}
           </div>
         </div>
       </div>

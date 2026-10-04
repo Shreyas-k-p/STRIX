@@ -32,18 +32,14 @@ export const Protocol = {
     return `CMD|SERVO|STOP${LINE_TERMINATOR}`;
   },
 
-  servoCw(speed?: number): string {
-    if (speed !== undefined && speed > 0) {
-      return `CMD|SERVO|CW|${Math.round(speed)}${LINE_TERMINATOR}`;
-    }
-    return `CMD|SERVO|CW${LINE_TERMINATOR}`;
+  servoCw(speed: number = 65): string {
+    const spd = Math.round(speed) || 65;
+    return `CMD|SERVO|CW|${spd}${LINE_TERMINATOR}`;
   },
 
-  servoCcw(speed?: number): string {
-    if (speed !== undefined && speed > 0) {
-      return `CMD|SERVO|CCW|${Math.round(speed)}${LINE_TERMINATOR}`;
-    }
-    return `CMD|SERVO|CCW${LINE_TERMINATOR}`;
+  servoCcw(speed: number = 65): string {
+    const spd = Math.round(speed) || 65;
+    return `CMD|SERVO|CCW|${spd}${LINE_TERMINATOR}`;
   },
 
   servoValue(value: 0 | 90 | 180): string {
@@ -156,14 +152,29 @@ export const Protocol = {
             },
           };
         }
+
+        if (sensorType === 'IR') {
+          const val = (rawVal || '').trim().toUpperCase();
+          const isObstacle =
+            val === 'OBSTACLE' || val === '1' || val === 'DETECTED' || val === 'TRUE';
+          return {
+            type: 'IR',
+            raw: trimmed,
+            timestamp: now,
+            payload: {
+              irObstacle: isObstacle,
+            },
+          };
+        }
       }
 
-      // 2. DATA|TEMP=value|HUM=value|MQ135_RAW=value|DIST=value
+      // 2. DATA|TEMP=value|HUM=value|MQ135_RAW=value|DIST=value|IR=CLEAR/OBSTACLE
       if (prefix === 'DATA') {
         let temp: number | null = null;
         let hum: number | null = null;
         let mq135Raw: number | null = null;
         let dist: number | null = null;
+        let irObstacle: boolean | null = null;
 
         for (let i = 1; i < parts.length; i++) {
           const segment = parts[i];
@@ -184,6 +195,10 @@ export const Protocol = {
           } else if (k === 'DIST') {
             const val = parseFloat(v);
             if (!isNaN(val)) dist = Math.max(0, val);
+          } else if (k === 'IR') {
+            const vUp = v.toUpperCase();
+            irObstacle =
+              vUp === 'OBSTACLE' || vUp === '1' || vUp === 'DETECTED' || vUp === 'TRUE';
           }
         }
 
@@ -204,6 +219,7 @@ export const Protocol = {
             mq135CalibratedPpm: null,
             mq135Status: status,
             ultrasonicDistanceCm: dist,
+            irObstacle,
           },
         };
       }

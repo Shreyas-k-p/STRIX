@@ -164,10 +164,11 @@ void loop() {
        │ Wi-Fi / WebSocket (ws://10.82.165.164:81)
        ▼
 ESP2 Main Controller
-   ├── UART (TX:42, RX:41) ──> ESP1 (RX:25, TX:26)
+   ├── UART (TX2:17, RX2:16) ─> ESP1 (RX:25, TX:26)
    │                           ├── DHT11 (GPIO33)
    │                           ├── MQ-135 (AO GPIO34)
    │                           ├── HC-SR04 (TRIG:21, ECHO:35)
+   │                           ├── IR Sensor (OUT: GPIO27)
    │                           └── Continuous Servo (GPIO32)
    ├── L298N #1 (Port 3-wheels: ENA:25, IN1:26, IN2:27, ENB:14, IN3:12, IN4:13)
    ├── L298N #2 (Starboard 3-wheels: ENA:33, IN1:32, IN2:23, ENB:22, IN3:21, IN4:19)
@@ -220,8 +221,8 @@ ESP32-S3 Camera ──[ Direct Wi-Fi MJPEG ]──> Laptop STRIX Web App`}
                   </div>
                   <div className="p-2.5 bg-slate-900 rounded border border-slate-800 space-y-1 text-[11px]">
                     <div className="text-white font-bold">ESP2 ↔ ESP1 UART Bus:</div>
-                    <div>ESP2 TX: <code className="text-cyan-300">GPIO42</code> → ESP1 RX: <code className="text-cyan-300">GPIO25</code></div>
-                    <div>ESP2 RX: <code className="text-cyan-300">GPIO41</code> ← ESP1 TX: <code className="text-cyan-300">GPIO26</code></div>
+                    <div>ESP2 TX2: <code className="text-cyan-300">GPIO17</code> → ESP1 RX: <code className="text-cyan-300">GPIO25</code></div>
+                    <div>ESP2 RX2: <code className="text-cyan-300">GPIO16</code> ← ESP1 TX: <code className="text-cyan-300">GPIO26</code></div>
                     <div>GND: Common Ground</div>
                   </div>
                 </div>
@@ -232,7 +233,7 @@ ESP32-S3 Camera ──[ Direct Wi-Fi MJPEG ]──> Laptop STRIX Web App`}
                 <h4 className="text-xs font-bold text-emerald-400 uppercase flex items-center gap-1.5">
                   <Layers className="w-4 h-4" /> ESP1 Sensors & Continuous Servo Pinouts
                 </h4>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[11px]">
                   <div className="p-2.5 bg-slate-900 rounded border border-slate-800">
                     <div className="text-white font-bold">DHT11</div>
                     <div>Data: <code className="text-emerald-300">GPIO33</code></div>
@@ -247,6 +248,11 @@ ESP32-S3 Camera ──[ Direct Wi-Fi MJPEG ]──> Laptop STRIX Web App`}
                     <div className="text-white font-bold">HC-SR04</div>
                     <div>TRIG: <code className="text-emerald-300">GPIO21</code></div>
                     <div>ECHO: <code className="text-emerald-300">GPIO35</code></div>
+                  </div>
+                  <div className="p-2.5 bg-slate-900 rounded border border-slate-800">
+                    <div className="text-white font-bold">IR Obstacle</div>
+                    <div>OUT: <code className="text-emerald-300">GPIO27</code></div>
+                    <div className="text-[10px] text-slate-400">3.3V (Active LOW)</div>
                   </div>
                   <div className="p-2.5 bg-slate-900 rounded border border-slate-800">
                     <div className="text-white font-bold">Continuous Servo</div>

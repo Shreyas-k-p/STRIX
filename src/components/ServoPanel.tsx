@@ -34,7 +34,7 @@ export const ServoPanel: React.FC<ServoPanelProps> = ({
   onSendCcw,
   onToggleInvert,
 }) => {
-  const [speed, setSpeed] = useState<number>(75);
+  const [speed, setSpeed] = useState<number>(65);
   const [isMomentary, setIsMomentary] = useState<boolean>(false);
   const [localInvert, setLocalInvert] = useState<boolean>(servoState.isInverted ?? false);
   const [activeHotkey, setActiveHotkey] = useState<'Q' | 'E' | 'R' | null>(null);
@@ -143,9 +143,9 @@ export const ServoPanel: React.FC<ServoPanelProps> = ({
     };
   }, [isMomentary, handleCcw, handleCw, handleStop]);
 
-  // Determine current active rotation
-  const isSpinningCw = servoState.state === 'CW' || (servoState.speed !== undefined && servoState.speed > 0);
-  const isSpinningCcw = servoState.state === 'CCW' || (servoState.speed !== undefined && servoState.speed < 0);
+  // Determine current active rotation based strictly on active state
+  const isSpinningCw = servoState.state === 'CW';
+  const isSpinningCcw = servoState.state === 'CCW';
   const isHalted = !isSpinningCw && !isSpinningCcw;
 
   return (
@@ -282,8 +282,8 @@ export const ServoPanel: React.FC<ServoPanelProps> = ({
         <div className="flex items-center justify-between gap-2 pt-1">
           {[
             { label: 'SLOW (30%)', val: 30 },
-            { label: 'HALF (50%)', val: 50 },
-            { label: 'CRUISE (75%)', val: 75 },
+            { label: 'TARGET (65%)', val: 65 },
+            { label: 'CRUISE (80%)', val: 80 },
             { label: 'TURBO (100%)', val: 100 },
           ].map((preset) => (
             <button
@@ -333,7 +333,7 @@ export const ServoPanel: React.FC<ServoPanelProps> = ({
 
       {/* Footer Hardware Info */}
       <div className="mt-3 text-[10px] font-mono text-slate-500 bg-slate-950 p-2 rounded border border-slate-900">
-        ⚙️ <span className="text-emerald-400 font-bold">CONTINUOUS SERVO LOGIC:</span> Value 90 = STOP, 180 = CW, 0 = CCW. Commands: CMD|SERVO|CW, CMD|SERVO|CCW, CMD|SERVO|STOP.
+        ⚙️ <span className="text-emerald-400 font-bold">CONTINUOUS SERVO LOGIC:</span> Value 90 = STOP, 180 = CW, 0 = CCW. Commands: CMD|SERVO|CW|&lt;spd&gt;, CMD|SERVO|CCW|&lt;spd&gt;, CMD|SERVO|STOP.
       </div>
     </div>
   );

@@ -118,7 +118,7 @@ export function useRover() {
   // Continuous Rotation Servo state: 90 = STOP, 180 = CW, 0 = CCW
   const [servoState, setServoState] = useState<ServoState>({
     state: 'STOP',
-    speed: 100,
+    speed: 65,
     value: 90,
     isInverted: false,
     angle: 90,
@@ -313,6 +313,10 @@ export function useRover() {
               packet.payload.ultrasonicDistanceCm !== null
                 ? packet.payload.ultrasonicDistanceCm
                 : prev.ultrasonicDistanceCm,
+            irObstacle:
+              packet.payload.irObstacle !== null && packet.payload.irObstacle !== undefined
+                ? packet.payload.irObstacle
+                : prev.irObstacle,
             lastUpdated: now,
           }));
           setConnectionState((prev) => ({ ...prev, esp2ToEsp1Uart: 'CONNECTED' }));
@@ -575,12 +579,13 @@ export function useRover() {
 
   const sendServoCw = useCallback(
     async (customSpeed?: number) => {
-      const speed = customSpeed ?? servoState.speed;
+      const speed = customSpeed ?? (servoState.speed || 65);
       const isInv = servoState.isInverted;
       const effectiveVal = isInv ? 0 : 180;
       setServoState((prev) => ({
         ...prev,
         state: 'CW',
+        speed,
         value: effectiveVal,
         angle: effectiveVal,
       }));
@@ -592,12 +597,13 @@ export function useRover() {
 
   const sendServoCcw = useCallback(
     async (customSpeed?: number) => {
-      const speed = customSpeed ?? servoState.speed;
+      const speed = customSpeed ?? (servoState.speed || 65);
       const isInv = servoState.isInverted;
       const effectiveVal = isInv ? 180 : 0;
       setServoState((prev) => ({
         ...prev,
         state: 'CCW',
+        speed,
         value: effectiveVal,
         angle: effectiveVal,
       }));

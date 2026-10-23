@@ -58,10 +58,10 @@ export function App() {
 
   // Camera state (Independent ESP32-S3 Wi-Fi feed)
   const [cameraState, setCameraState] = useState<CameraState>({
-    url: 'http://192.168.4.1:81/stream',
+    url: 'http://192.168.4.2/stream',
     status: 'IDLE',
     fps: 0,
-    resolution: '640x480',
+    resolution: '320x240',
     isStreaming: true,
     aspectRatio: '16:9',
     lastFrameTimestamp: null,
@@ -121,13 +121,13 @@ export function App() {
             [STRIX_GCS: ONLINE]
           </span>
           <span className="text-slate-700">|</span>
-          <span className="text-emerald-500/80">LINK: WS://10.82.165.164:81</span>
+          <span className="text-emerald-500/80">LINK: WS://192.168.4.1:81</span>
           <span className="text-slate-700">|</span>
           <span className="text-emerald-500/80">MAIN: ESP2 (DUAL L298N + 4 RELAYS)</span>
           <span className="text-slate-700">|</span>
           <span className="text-emerald-500/80">BUS: ESP2 ↔ ESP1 UART</span>
           <span className="text-slate-700">|</span>
-          <span className="text-emerald-500/80">VIDEO: ESP32-S3 WI-FI DIRECT</span>
+          <span className="text-emerald-500/80">VIDEO: ESP32-S3 (192.168.4.2)</span>
         </div>
         <div className="flex items-center gap-2 shrink-0 text-[10px]">
           <span className="text-emerald-500/70">
@@ -145,7 +145,7 @@ export function App() {
           <div className="flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
             <span>
-              Connection Error: <strong>{serial.lastError}</strong>. Ensure your laptop is connected to Wi-Fi SSID <strong>"REY"</strong> and ESP2 is powered at <strong>10.82.165.164:81</strong>.
+              Connection Error: <strong>{serial.lastError}</strong>. Ensure your laptop is connected to Wi-Fi SSID <strong>"ESP2_ROVER"</strong> and ESP2 is powered at <strong>192.168.4.1:81</strong>.
             </span>
           </div>
           <button
@@ -165,6 +165,7 @@ export function App() {
           <div className="lg:col-span-4 xl:col-span-5 flex flex-col">
             <CameraPanel
               cameraState={cameraState}
+              isWifiConnected={serial.isConnected || connectionState.laptopToEsp2Ws === 'CONNECTED'}
               onUpdateCameraUrl={handleUpdateCameraUrl}
               onLog={addLog}
               onCameraStatusChange={handleCameraStatusChange}
@@ -260,9 +261,9 @@ export function App() {
           <span className="text-[10px] text-emerald-400 font-bold">[ARMED]</span>
         </div>
         <div className="flex items-center gap-4 text-[11px]">
-          <span>LINK: <strong className="text-emerald-400">ws://10.82.165.164:81</strong></span>
+          <span>LINK: <strong className="text-emerald-400">ws://192.168.4.1:81</strong></span>
           <span>MOTORS: <strong className="text-emerald-400">4x H-BRIDGE (ESP2)</strong></span>
-          <span>VIDEO: <strong className="text-emerald-400">ESP32-S3 WI-FI DIRECT</strong></span>
+          <span>VIDEO: <strong className="text-emerald-400">ESP32-S3 (192.168.4.2)</strong></span>
         </div>
       </footer>
 

@@ -45,7 +45,7 @@ export const EventLog: React.FC<EventLogProps> = ({
     if (filter === 'ALL') return true;
     if (filter === 'CMD') return log.level === 'CMD' || log.level === 'ACK';
     if (filter === 'TEL') return log.level === 'TEL';
-    if (filter === 'ERROR') return log.level === 'ERROR';
+    if (filter === 'ERROR') return log.level === 'ERROR' || log.level === 'WARN';
     return true;
   });
 
@@ -70,6 +70,8 @@ export const EventLog: React.FC<EventLogProps> = ({
         return 'text-emerald-400';
       case 'ACK':
         return 'text-cyan-400 font-bold';
+      case 'WARN':
+        return 'text-amber-300 font-bold';
       case 'ERROR':
         return 'text-rose-400 font-black';
       case 'INFO':

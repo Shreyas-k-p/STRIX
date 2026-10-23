@@ -168,6 +168,66 @@ class SoundFxManager {
       // Fallback
     }
   }
+
+  // Proximity warning alert (triggered when ultrasonic distance reaches <= 10 cm)
+  public playProximityWarning() {
+    if (!this.enabled) return;
+    try {
+      this.initCtx();
+      if (!this.ctx) return;
+      const ctx = this.ctx;
+      const now = ctx.currentTime;
+
+      // Crisp dual-tone proximity radar beep
+      [0, 0.1].forEach((offset, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(idx === 0 ? 880 : 1046.5, now + offset);
+        gain.gain.setValueAtTime(0.09, now + offset);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.08);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + offset);
+        osc.stop(now + offset + 0.085);
+      });
+    } catch {
+      // Fallback
+    }
+  }
+
+  // Critical collision auto-stop alarm (triggered when ultrasonic distance reaches <= 5 cm)
+  public playCollisionStopAlarm() {
+    if (!this.enabled) return;
+    try {
+      this.initCtx();
+      if (!this.ctx) return;
+      const ctx = this.ctx;
+      const now = ctx.currentTime;
+
+      // Assertive urgent 3-pulse emergency halt warble
+      const beeps = [
+        { freq: 1050, offset: 0.0, dur: 0.1 },
+        { freq: 780, offset: 0.11, dur: 0.1 },
+        { freq: 1200, offset: 0.22, dur: 0.14 },
+      ];
+
+      beeps.forEach(({ freq, offset, dur }) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(freq, now + offset);
+        gain.gain.setValueAtTime(0.14, now + offset);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + offset + dur);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + offset);
+        osc.stop(now + offset + dur + 0.01);
+      });
+    } catch {
+      // Fallback
+    }
+  }
 }
 
 export const soundFx = new SoundFxManager();

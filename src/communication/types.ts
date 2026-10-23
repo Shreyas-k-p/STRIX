@@ -63,7 +63,7 @@ export interface ServoState {
 export type LinkStatus = 'DISCONNECTED' | 'CONNECTING' | 'CONNECTED';
 
 export interface ConnectionState {
-  laptopToEsp2Ws: LinkStatus;    // Wi-Fi WebSocket (ws://10.82.165.164:81)
+  laptopToEsp2Ws: LinkStatus;    // Wi-Fi WebSocket (ws://192.168.4.1:81)
   esp2ToEsp1Uart: LinkStatus;    // ESP2 to ESP1 UART (Sensors)
   cameraWifi: LinkStatus;        // ESP32-S3 Camera Wi-Fi
   overallStatus: 'DISCONNECTED' | 'CONNECTING' | 'CONNECTED';
@@ -102,7 +102,7 @@ export interface CameraState {
   lastFrameTimestamp: number | null;
 }
 
-export type LogLevel = 'INFO' | 'CMD' | 'TEL' | 'ACK' | 'ERROR';
+export type LogLevel = 'INFO' | 'CMD' | 'TEL' | 'ACK' | 'ERROR' | 'WARN';
 
 export interface LogEntry {
   id: string;

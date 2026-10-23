@@ -45,13 +45,13 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ connection }) 
   const links = [
     {
       title: 'Laptop GCS ↔ ESP2 Main Controller',
-      sub: `Wi-Fi WebSocket (ws://10.82.165.164:81) ${connection.rssi ? `[RSSI: ${connection.rssi} dBm]` : ''}`,
+      sub: `Wi-Fi WebSocket (ws://192.168.4.1:81) ${connection.rssi ? `[RSSI: ${connection.rssi} dBm]` : ''}`,
       status: connection.laptopToEsp2Ws,
       icon: <Wifi className="w-4 h-4 text-emerald-400" />,
     },
     {
       title: 'ESP2 ↔ ESP1 UART Bus',
-      sub: 'Sensors: DHT11 (33), MQ135 (34), HC-SR04 (21/35), IR (27) & Servo (32) via UART (TX2:17, RX2:16)',
+      sub: 'Sensors: DHT11 (33), MQ135 (34), HC-SR04 (21/35) & Servo (32) via UART (TX2:17, RX2:16)',
       status: connection.esp2ToEsp1Uart,
       icon: <Layers className="w-4 h-4 text-amber-400" />,
     },
@@ -69,7 +69,7 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ connection }) 
     },
     {
       title: 'ESP32-S3 Camera ↔ Laptop Web App',
-      sub: 'Independent Wi-Fi Direct MJPEG Stream (Bypasses ESP2)',
+      sub: 'Low Latency MJPEG Stream (http://192.168.4.2/stream)',
       status: connection.cameraWifi,
       icon: <Wifi className="w-4 h-4 text-cyan-400" />,
     },

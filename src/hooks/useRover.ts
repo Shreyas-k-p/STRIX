@@ -16,6 +16,7 @@ import type {
 import { Protocol } from '../communication/protocol';
 import { useSerial } from './useSerial';
 import { ESP2_WS_URL } from '../communication/websocket';
+import { soundFx } from '../utils/audio';
 
 const DEFAULT_THRESHOLDS: SensorThresholds = {
   tempWarning: 38.0,
@@ -24,8 +25,8 @@ const DEFAULT_THRESHOLDS: SensorThresholds = {
   humidityWarningLow: 20.0,
   mq135Warning: 1800,
   mq135Danger: 2500,
-  ultrasonicWarningCm: 25.0,
-  ultrasonicDangerCm: 12.0,
+  ultrasonicWarningCm: 10.0,
+  ultrasonicDangerCm: 5.0,
 };
 
 // 4 H-Bridge channels across 2 L298N drivers driving the 6 wheels
@@ -524,13 +525,29 @@ export function useRover() {
   // Motor Control actions
   const sendMotorDirection = useCallback(
     async (direction: MotorDirection) => {
+      // Block forward movement if obstacle is within 5 cm
+      if (
+        direction === 'FORWARD' &&
+        sensorData.ultrasonicDistanceCm !== null &&
+        sensorData.ultrasonicDistanceCm > 0 &&
+        sensorData.ultrasonicDistanceCm <= 5.0
+      ) {
+        soundFx.playCollisionStopAlarm();
+        addLog(
+          'ERROR',
+          `🚨 FORWARD MOTION BLOCKED: Ultrasonic obstacle at ${sensorData.ultrasonicDistanceCm.toFixed(1)} cm (≤ 5 cm)`,
+          undefined,
+          'SAFETY'
+        );
+        return;
+      }
       const cmd = Protocol.motorDirection(direction);
       const success = await sendCommand(cmd, 'MOTOR', direction);
       if (success) {
         updateMotorDetails(direction, motorState.speed);
       }
     },
-    [sendCommand, updateMotorDetails, motorState.speed]
+    [sendCommand, updateMotorDetails, motorState.speed, sensorData.ultrasonicDistanceCm, addLog]
   );
 
   const setMotorSpeed = useCallback(
@@ -727,6 +744,77 @@ export function useRover() {
       window.removeEventListener('keyup', handleKeyUp);
     };
   }, [sendMotorDirection, emergencyStop]);
+
+  // Ultrasonic Distance safety monitoring:
+  // - When distance reaches <= 10 cm: play warning sound
+  // - When distance reaches <= 5 cm: halt rover (emergencyStop) and play alarm sound
+  const lastProximitySoundRef = useRef<{ type: 'warn' | 'stop' | null; timestamp: number }>({
+    type: null,
+    timestamp: 0,
+  });
+  const hasAutoHaltedRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    const dist = sensorData.ultrasonicDistanceCm;
+    if (dist === null || dist <= 0) {
+      hasAutoHaltedRef.current = false;
+      return;
+    }
+
+    const now = Date.now();
+
+    // 1. Critical Stop Zone (<= 5 cm): HALT rover & play alarm sound
+    if (dist <= 5.0) {
+      // Play emergency halt alarm sound (throttled to at most once per 1200ms)
+      if (
+        lastProximitySoundRef.current.type !== 'stop' ||
+        now - lastProximitySoundRef.current.timestamp > 1200
+      ) {
+        soundFx.playCollisionStopAlarm();
+        lastProximitySoundRef.current = { type: 'stop', timestamp: now };
+      }
+
+      // Automatically halt motors if moving or hasn't halted yet for this encounter
+      if (!hasAutoHaltedRef.current || motorState.roverDirection !== 'STOP') {
+        hasAutoHaltedRef.current = true;
+        emergencyStop();
+        addLog(
+          'ERROR',
+          `🚨 COLLISION IMMINENT (${dist.toFixed(1)} cm ≤ 5 cm): ROVER AUTO-HALTED! 🚨`,
+          undefined,
+          'SAFETY'
+        );
+      }
+      return;
+    }
+
+    // Reset auto-halt flag when obstacle clears beyond 5 cm
+    if (dist > 5.0) {
+      hasAutoHaltedRef.current = false;
+    }
+
+    // 2. Proximity Warning Zone (<= 10 cm and > 5 cm): play warning sound
+    if (dist <= 10.0) {
+      if (
+        lastProximitySoundRef.current.type !== 'warn' ||
+        now - lastProximitySoundRef.current.timestamp > 900
+      ) {
+        soundFx.playProximityWarning();
+        lastProximitySoundRef.current = { type: 'warn', timestamp: now };
+        addLog(
+          'WARN',
+          `⚠️ PROXIMITY CAUTION: Obstacle detected within ${dist.toFixed(1)} cm (≤ 10 cm)`,
+          undefined,
+          'SENSORS'
+        );
+      }
+    } else {
+      // Clear sound type when obstacle clears > 10 cm
+      if (lastProximitySoundRef.current.type !== null) {
+        lastProximitySoundRef.current = { type: null, timestamp: 0 };
+      }
+    }
+  }, [sensorData.ultrasonicDistanceCm, motorState.roverDirection, emergencyStop, addLog]);
 
   // Log management helpers
   const clearLogs = useCallback(() => setLogs([]), []);

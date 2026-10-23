@@ -29,13 +29,13 @@ export const HardwareInfoModal: React.FC<HardwareInfoModalProps> = ({
   };
 
   const sampleEsp2Firmware = `// ESP2 MAIN CONTROLLER - WebSocket & Hardware Bridge
-// Wi-Fi: SSID "REY"
-// IP: 10.82.165.164 | TCP Port: 81 (WebSocket)
+// Wi-Fi AP SSID: "ESP2_ROVER" (Password: 12345678)
+// AP IP: 192.168.4.1 | Port 81 (WebSocket) | Port 82 (TCP for S3)
 #include <WiFi.h>
 #include <WebSocketsServer.h>
 
-const char* ssid = "REY";
-const char* password = "REY22222";
+const char* ssid = "ESP2_ROVER";
+const char* password = "12345678";
 
 WebSocketsServer webSocket = WebSocketsServer(81);
 
@@ -143,13 +143,13 @@ void loop() {
                 </h4>
                 <div className="text-[11px] leading-relaxed text-slate-300 space-y-3 font-mono">
                   <div className="p-3 bg-slate-900/80 rounded-lg border border-slate-800">
-                    <strong className="text-emerald-400">ESP2 (Main Controller):</strong> Connects directly to laptop STRIX Web App via Wi-Fi WebSocket (ws://10.82.165.164:81). Drives dual L298N motor drivers, 4 relays, and talks to ESP1 via UART.
+                    <strong className="text-emerald-400">ESP2 (Main Controller):</strong> AP Hotspot (ESP2_ROVER) at 192.168.4.1. Hosts WebSocket on port 81 and TCP on port 82 for ESP32-S3. Drives L298N motors, 4 relays, and UART bridge to ESP1.
                   </div>
                   <div className="p-3 bg-slate-900/80 rounded-lg border border-slate-800">
                     <strong className="text-white">ESP1 (Sensors & Continuous Servo):</strong> Reads DHT11, MQ-135, HC-SR04, and controls the continuous rotation servo. Connected to ESP2 via UART.
                   </div>
                   <div className="p-3 bg-slate-900/80 rounded-lg border border-cyan-900/50">
-                    <strong className="text-cyan-300">ESP32-S3 Camera (Independent Wi-Fi Stream):</strong> Runs dedicated MJPEG video server over Wi-Fi direct. Completely independent from ESP2 control communication.
+                    <strong className="text-cyan-300">ESP32-S3 Camera (STA Mode):</strong> Connects to ESP2_ROVER AP (IP 192.168.4.2). Serves low latency MJPEG stream at http://192.168.4.2/stream and connects to ESP2 via TCP:82.
                   </div>
                   <div className="p-2 bg-slate-950 rounded border border-slate-800 text-slate-400 text-[10px]">
                     Note: ESP3, ESP4, and NRF24 are NOT part of the final hardware system.
@@ -161,21 +161,19 @@ void loop() {
               <pre className="p-4 bg-black rounded-lg border border-cyan-950 text-cyan-400/90 text-[10px] leading-tight overflow-x-auto">
 {`Laptop STRIX Web App
        │
-       │ Wi-Fi / WebSocket (ws://10.82.165.164:81)
+       │ Wi-Fi AP Client / WebSocket (ws://192.168.4.1:81)
        ▼
-ESP2 Main Controller
-   ├── UART (TX2:17, RX2:16) ─> ESP1 (RX:25, TX:26)
-   │                           ├── DHT11 (GPIO33)
-   │                           ├── MQ-135 (AO GPIO34)
-   │                           ├── HC-SR04 (TRIG:21, ECHO:35)
-   │                           ├── IR Sensor (OUT: GPIO27)
-   │                           └── Continuous Servo (GPIO32)
-   ├── L298N #1 (Port 3-wheels: ENA:25, IN1:26, IN2:27, ENB:14, IN3:12, IN4:13)
-   ├── L298N #2 (Starboard 3-wheels: ENA:33, IN1:32, IN2:23, ENB:22, IN3:21, IN4:19)
-   └── 4-Channel Relays (Active LOW: Module 1 GPIO 4, 15 | Module 2 GPIO 18, 5)
-
-[Separate Module]
-ESP32-S3 Camera ──[ Direct Wi-Fi MJPEG ]──> Laptop STRIX Web App`}
+ESP2 Main Controller (AP: ESP2_ROVER | 192.168.4.1)
+   ├── WebSocket Server (Port 81) -> Laptop GCS Web App
+   ├── TCP Server (Port 82) <─────── ESP32-S3 Camera (192.168.4.2)
+   ├── UART (TX2:17, RX2:16) ──────> ESP1 (RX:25, TX:26)
+   │                                ├── DHT11 (GPIO33)
+   │                                ├── MQ-135 (AO GPIO34)
+   │                                ├── HC-SR04 (TRIG:21, ECHO:35)
+   │                                ├── IR Sensor (OUT: GPIO27)
+   │                                └── Continuous Servo (GPIO32)
+   ├── L298N Motor Driver (LEFT: ENA:33, IN1:32, IN2:23 | RIGHT: ENB:22, IN3:21, IN4:19)
+   └── 4-Channel Relays (Active LOW: Relay 1: 4 | Relay 2: 15 | Relay 3: 18 | Relay 4: 5)`}
               </pre>
             </div>
           )}
@@ -248,11 +246,6 @@ ESP32-S3 Camera ──[ Direct Wi-Fi MJPEG ]──> Laptop STRIX Web App`}
                     <div className="text-white font-bold">HC-SR04</div>
                     <div>TRIG: <code className="text-emerald-300">GPIO21</code></div>
                     <div>ECHO: <code className="text-emerald-300">GPIO35</code></div>
-                  </div>
-                  <div className="p-2.5 bg-slate-900 rounded border border-slate-800">
-                    <div className="text-white font-bold">IR Obstacle</div>
-                    <div>OUT: <code className="text-emerald-300">GPIO27</code></div>
-                    <div className="text-[10px] text-slate-400">3.3V (Active LOW)</div>
                   </div>
                   <div className="p-2.5 bg-slate-900 rounded border border-slate-800">
                     <div className="text-white font-bold">Continuous Servo</div>

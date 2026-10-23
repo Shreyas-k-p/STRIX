@@ -3,9 +3,6 @@ import {
   Thermometer,
   Wind,
   Ruler,
-  AlertOctagon,
-  ShieldCheck,
-  ShieldAlert,
   Sliders,
   Radio,
 } from 'lucide-react';
@@ -64,6 +61,21 @@ export const SensorDashboard: React.FC<SensorDashboardProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          <span
+            className={`inline-flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded border ${
+              isConnected
+                ? 'text-emerald-400 border-emerald-500/40 bg-emerald-950/40'
+                : 'text-slate-500 border-slate-800 bg-slate-950'
+            }`}
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'
+              }`}
+            />
+            {isConnected ? 'LIVE' : 'STANDBY'}
+          </span>
+
           <button
             onClick={() => setIsEditingThresholds(!isEditingThresholds)}
             className="flex items-center gap-1 px-2 py-1 rounded bg-slate-950 hover:bg-slate-900 text-amber-400 border border-amber-500/40 text-[11px] font-mono transition-colors font-bold"
@@ -270,8 +282,8 @@ export const SensorDashboard: React.FC<SensorDashboardProps> = ({
           </div>
         </div>
 
-        {/* Card 3: HC-SR04 Ultrasonic Distance Meter */}
-        <div className="bg-slate-950/90 rounded-xl border border-amber-500/20 p-3.5 flex flex-col justify-between shadow-inner">
+        {/* Card 3: HC-SR04 Ultrasonic Distance Meter (Full Width) */}
+        <div className="sm:col-span-2 bg-slate-950/90 rounded-xl border border-amber-500/20 p-3.5 flex flex-col justify-between shadow-inner">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
               <Ruler className="w-4 h-4 text-amber-400" />
@@ -279,7 +291,7 @@ export const SensorDashboard: React.FC<SensorDashboardProps> = ({
             </div>
             {sensorData.ultrasonicDistanceCm !== null ? (
               <span
-                className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border ${
+                className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded border ${
                   distStatus === 'IMPACT IMMINENT'
                     ? 'bg-rose-950/80 text-rose-300 border-rose-500 animate-pulse'
                     : distStatus === 'PROXIMITY'
@@ -287,7 +299,11 @@ export const SensorDashboard: React.FC<SensorDashboardProps> = ({
                     : 'bg-emerald-950/80 text-emerald-300 border-emerald-500'
                 }`}
               >
-                [{distStatus}]
+                {distStatus === 'IMPACT IMMINENT'
+                  ? '[STOP / DANGER ≤ 5cm]'
+                  : distStatus === 'PROXIMITY'
+                  ? '[PROXIMITY WARN ≤ 10cm]'
+                  : '[CLEAR]'}
               </span>
             ) : (
               <span className="text-[10px] font-mono text-slate-600 font-bold">NO DATA</span>
@@ -305,7 +321,7 @@ export const SensorDashboard: React.FC<SensorDashboardProps> = ({
                 : 'NO DATA'}
             </div>
             <div className="text-[9px] font-mono text-slate-400 font-bold uppercase tracking-wider">
-              FORWARD OBSTACLE RANGE
+              FORWARD OBSTACLE RANGE (AUTO-HALT &lt;= 5 CM)
             </div>
           </div>
 
@@ -314,7 +330,7 @@ export const SensorDashboard: React.FC<SensorDashboardProps> = ({
             {sensorData.ultrasonicDistanceCm !== null && (
               <div
                 style={{
-                  width: `${Math.min(100, Math.max(5, (sensorData.ultrasonicDistanceCm / 150) * 100))}%`,
+                  width: `${Math.min(100, Math.max(5, (sensorData.ultrasonicDistanceCm / 100) * 100))}%`,
                 }}
                 className={`h-full transition-all duration-300 ${
                   distStatus === 'IMPACT IMMINENT'
@@ -325,47 +341,6 @@ export const SensorDashboard: React.FC<SensorDashboardProps> = ({
                 }`}
               />
             )}
-          </div>
-        </div>
-
-        {/* Card 4: IR Obstacle Sensor */}
-        <div className="bg-slate-950/90 rounded-xl border border-amber-500/20 p-3.5 flex flex-col justify-between shadow-inner">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
-              <AlertOctagon className="w-4 h-4 text-amber-400" />
-              <span>IR OBSTACLE SENSOR</span>
-            </div>
-            <span className="text-[10px] font-mono text-slate-500 font-bold">ESP1 GPIO27</span>
-          </div>
-
-          <div className="flex flex-col items-center justify-center py-3">
-            {sensorData.irObstacle !== null ? (
-              <div
-                className={`flex items-center gap-2 px-4 py-2 rounded border text-sm font-black font-mono tracking-wider shadow-lg ${
-                  sensorData.irObstacle
-                    ? 'bg-rose-950 text-rose-300 border-rose-500 ring-2 ring-rose-500 animate-pulse'
-                    : 'bg-emerald-950/60 text-emerald-300 border-emerald-500'
-                }`}
-              >
-                {sensorData.irObstacle ? (
-                  <>
-                    <ShieldAlert className="w-4 h-4 text-rose-400" />
-                    <span>OBSTACLE</span>
-                  </>
-                ) : (
-                  <>
-                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                    <span>CLEAR</span>
-                  </>
-                )}
-              </div>
-            ) : (
-              <div className="text-xl font-bold font-mono text-slate-600">NO DATA</div>
-            )}
-          </div>
-
-          <div className="text-[9px] font-mono text-slate-500 text-right mt-1">
-            STATUS: {sensorData.irObstacle !== null ? (sensorData.irObstacle ? 'OBSTACLE DETECTED' : 'CLEAR') : (isConnected ? 'ACTIVE' : 'NO DATA')}
           </div>
         </div>
       </div>

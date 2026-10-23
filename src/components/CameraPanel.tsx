@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Maximize2,
   Minimize2,
@@ -17,7 +17,10 @@ interface CameraPanelProps {
   onUpdateCameraUrl: (url: string) => void;
   onLog: (level: 'INFO' | 'CMD' | 'TEL' | 'ACK' | 'ERROR', msg: string) => void;
   onCameraStatusChange?: (status: 'CONNECTED' | 'DISCONNECTED') => void;
+  isWifiConnected?: boolean;
 }
+
+type CameraStatus = 'CONNECTING' | 'LIVE' | 'ERROR';
 
 export const CameraPanel: React.FC<CameraPanelProps> = ({
   cameraState,
@@ -25,14 +28,14 @@ export const CameraPanel: React.FC<CameraPanelProps> = ({
   onLog,
   onCameraStatusChange,
 }) => {
-  const [streamUrl, setStreamUrl] = useState<string>(cameraState.url || 'http://192.168.4.1:81/stream');
+  const [streamUrl, setStreamUrl] = useState<string>(cameraState.url || 'http://192.168.4.2/stream');
+  const [imgSrc, setImgSrc] = useState<string>(cameraState.url || 'http://192.168.4.2/stream');
   const [inputUrl, setInputUrl] = useState<string>(streamUrl);
+  const [cameraStatus, setCameraStatus] = useState<CameraStatus>('CONNECTING');
   const [isConfigOpen, setIsConfigOpen] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [fps, setFps] = useState<number>(0);
-  const [isLive, setIsLive] = useState<boolean>(false);
-  const [hasError, setHasError] = useState<boolean>(false);
-  const [reloadKey, setReloadKey] = useState<number>(0);
+  const [reconnectKey, setReconnectKey] = useState<number>(0);
   const [isNightVision, setIsNightVision] = useState<boolean>(false);
   const [capturedImages, setCapturedImages] = useState<string[]>([]);
 
@@ -41,7 +44,18 @@ export const CameraPanel: React.FC<CameraPanelProps> = ({
   const frameCountRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(performance.now());
 
-  // FPS Calculator loop
+  // Sync state if cameraState.url changes externally
+  useEffect(() => {
+    if (cameraState.url && cameraState.url !== streamUrl) {
+      setStreamUrl(cameraState.url);
+      setImgSrc(cameraState.url);
+      setInputUrl(cameraState.url);
+      setCameraStatus('CONNECTING');
+      setReconnectKey((prev) => prev + 1);
+    }
+  }, [cameraState.url, streamUrl]);
+
+  // FPS Calculator loop: does NOT modify <img> src or force recreate <img>
   useEffect(() => {
     let animId: number;
     const updateFps = () => {
@@ -60,14 +74,12 @@ export const CameraPanel: React.FC<CameraPanelProps> = ({
 
   const handleImageLoad = () => {
     frameCountRef.current += 1;
-    setIsLive(true);
-    setHasError(false);
+    setCameraStatus('LIVE');
     if (onCameraStatusChange) onCameraStatusChange('CONNECTED');
   };
 
   const handleImageError = () => {
-    setIsLive(false);
-    setHasError(true);
+    setCameraStatus('ERROR');
     if (onCameraStatusChange) onCameraStatusChange('DISCONNECTED');
   };
 
@@ -82,20 +94,27 @@ export const CameraPanel: React.FC<CameraPanelProps> = ({
     }
   };
 
+  // Reconnect: Use cache-busting query ONLY on manual reload
+  const handleReload = useCallback(() => {
+    const separator = streamUrl.includes('?') ? '&' : '?';
+    const freshSrc = `${streamUrl}${separator}t=${Date.now()}`;
+    setImgSrc(freshSrc);
+    setCameraStatus('CONNECTING');
+    setReconnectKey((prev) => prev + 1);
+    onLog('INFO', `Reloading ESP32-S3 Camera video feed: ${streamUrl}`);
+  }, [streamUrl, onLog]);
+
   const handleSaveUrl = (e: React.FormEvent) => {
     e.preventDefault();
-    setStreamUrl(inputUrl);
-    onUpdateCameraUrl(inputUrl);
+    const cleanUrl = inputUrl.trim();
+    if (!cleanUrl) return;
+    setStreamUrl(cleanUrl);
+    setImgSrc(cleanUrl);
+    onUpdateCameraUrl(cleanUrl);
     setIsConfigOpen(false);
-    setReloadKey((prev) => prev + 1);
-    setHasError(false);
-    onLog('INFO', `Camera stream URL set to: ${inputUrl}`);
-  };
-
-  const handleReload = () => {
-    setReloadKey((prev) => prev + 1);
-    setHasError(false);
-    onLog('INFO', 'Reloading ESP32-S3 Camera video feed...');
+    setCameraStatus('CONNECTING');
+    setReconnectKey((prev) => prev + 1);
+    onLog('INFO', `Camera stream URL set to: ${cleanUrl}`);
   };
 
   const captureSnapshot = () => {
@@ -116,15 +135,13 @@ export const CameraPanel: React.FC<CameraPanelProps> = ({
     }
   };
 
-
-
   return (
     <div
       ref={containerRef}
       className="hud-panel rounded-xl p-4 shadow-xl flex flex-col h-full font-mono relative overflow-hidden bg-black/95 border-emerald-500/40"
     >
       {/* Panel Header */}
-      <div className="flex items-center justify-between border-b border-emerald-500/25 pb-2.5 mb-2 gap-2">
+      <div className="flex items-center justify-between border-b border-emerald-500/25 pb-2.5 mb-2 gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           <Crosshair className="w-4 h-4 text-emerald-400 animate-pulse" />
           <h2 className="text-sm font-black uppercase tracking-wider text-emerald-300 font-heading glow-matrix">
@@ -137,20 +154,30 @@ export const CameraPanel: React.FC<CameraPanelProps> = ({
 
         {/* Status Indicators & Controls */}
         <div className="flex items-center gap-1.5">
-          {/* Live indicator */}
+          {/* Status Indicator: CONNECTING -> OPTICS LIVE -> SIGNAL LOST */}
           <div
             className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono font-bold ${
-              isLive && !hasError
+              cameraStatus === 'LIVE'
                 ? 'bg-rose-950/80 text-rose-300 border border-rose-500'
+                : cameraStatus === 'CONNECTING'
+                ? 'bg-amber-950/80 text-amber-300 border border-amber-500'
                 : 'bg-slate-900 text-slate-500 border border-slate-800'
             }`}
           >
             <span
               className={`w-2 h-2 rounded-full ${
-                isLive && !hasError ? 'bg-rose-500 animate-ping' : 'bg-slate-600'
+                cameraStatus === 'LIVE'
+                  ? 'bg-rose-500 animate-ping'
+                  : cameraStatus === 'CONNECTING'
+                  ? 'bg-amber-400 animate-pulse'
+                  : 'bg-slate-600'
               }`}
             />
-            {isLive && !hasError ? 'OPTICS LIVE' : 'SIGNAL LOST'}
+            {cameraStatus === 'LIVE'
+              ? 'OPTICS LIVE'
+              : cameraStatus === 'CONNECTING'
+              ? 'CONNECTING...'
+              : 'SIGNAL LOST'}
           </div>
 
           {/* FPS Counter */}
@@ -211,7 +238,7 @@ export const CameraPanel: React.FC<CameraPanelProps> = ({
 
       {/* Camera Stream Viewport (Independent Wi-Fi Feed) */}
       <div
-        className="relative flex-1 flex items-center justify-center bg-black overflow-hidden scanline-bg select-none group"
+        className="relative flex-1 flex items-center justify-center bg-black overflow-hidden scanline-bg select-none group min-h-[320px]"
       >
         {/* Military HUD Targeting Overlay */}
         <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-3 z-10">
@@ -221,7 +248,11 @@ export const CameraPanel: React.FC<CameraPanelProps> = ({
               SOURCE: ESP32-S3 WI-FI &bull; INDEPENDENT MJPEG
             </span>
             <span className="bg-black/75 px-2 py-0.5 rounded border border-emerald-500/40 glow-matrix">
-              {isLive && !hasError ? 'VIDEO: ONLINE' : 'VIDEO: STANDBY'}
+              {cameraStatus === 'LIVE'
+                ? 'VIDEO: ONLINE'
+                : cameraStatus === 'CONNECTING'
+                ? 'VIDEO: CONNECTING'
+                : 'VIDEO: STANDBY'}
             </span>
           </div>
 
@@ -242,16 +273,16 @@ export const CameraPanel: React.FC<CameraPanelProps> = ({
               STREAM: {streamUrl}
             </span>
             <span className="bg-black/75 px-2 py-0.5 rounded border border-emerald-500/40">
-              FORMAT: MJPEG HTTP:81
+              PROTOCOL: MJPEG HTTP /stream
             </span>
           </div>
         </div>
 
-        {/* Actual Image Stream Element */}
+        {/* Actual Image Stream Element: Direct Browser HTTP MJPEG Connection */}
         <img
-          key={reloadKey}
+          key={reconnectKey}
           ref={imgRef}
-          src={streamUrl}
+          src={imgSrc}
           alt="ESP32-S3 Stream"
           onLoad={handleImageLoad}
           onError={handleImageError}
@@ -263,8 +294,8 @@ export const CameraPanel: React.FC<CameraPanelProps> = ({
           className="w-full h-full object-contain pointer-events-none"
         />
 
-        {/* Offline / Connection Error Overlay */}
-        {(!isLive || hasError) && (
+        {/* Offline / Connection Error Overlay - shown ONLY if stream fails */}
+        {cameraStatus === 'ERROR' && (
           <div className="absolute inset-0 bg-[#020408]/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-20 pointer-events-auto">
             <div className="w-16 h-16 rounded-full bg-black border border-emerald-500/40 flex items-center justify-center mb-3 shadow-[0_0_20px_rgba(0,255,65,0.2)]">
               <WifiOff className="w-8 h-8 text-emerald-400" />
@@ -279,8 +310,8 @@ export const CameraPanel: React.FC<CameraPanelProps> = ({
               <div className="flex items-center gap-1.5 text-emerald-400 font-bold">
                 <AlertCircle className="w-3.5 h-3.5" /> Optics Diagnostic:
               </div>
-              <p>1. Connect laptop Wi-Fi to ESP32-S3 access point.</p>
-              <p>2. Verify port 81 HTTP MJPEG stream (e.g. http://192.168.4.1:81/stream).</p>
+              <p>1. Connect laptop Wi-Fi to network (SSID: ESP2_ROVER).</p>
+              <p>2. Verify ESP32-S3 MJPEG stream: <span className="text-emerald-400">http://192.168.4.2/stream</span></p>
               <p>3. Optical feed runs independently of ESP2 WebSocket command channel.</p>
             </div>
             <div className="flex gap-2">
@@ -328,16 +359,44 @@ export const CameraPanel: React.FC<CameraPanelProps> = ({
             <form onSubmit={handleSaveUrl} className="flex flex-col gap-3 font-mono">
               <div>
                 <label className="block text-[11px] text-slate-400 mb-1">
-                  MJPEG STREAM URL (PORT 81):
+                  MJPEG STREAM URL:
                 </label>
                 <input
                   type="text"
                   value={inputUrl}
                   onChange={(e) => setInputUrl(e.target.value)}
-                  placeholder="http://192.168.4.1:81/stream"
+                  placeholder="http://192.168.4.2/stream"
                   className="w-full px-3 py-2 rounded bg-black border border-emerald-500/40 text-emerald-300 text-xs focus:outline-none focus:border-emerald-400"
                 />
               </div>
+
+              {/* Quick URL Presets */}
+              <div>
+                <span className="block text-[10px] text-slate-500 uppercase font-bold mb-1.5">
+                  Quick Presets:
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { label: 'S3 Stream (/stream)', url: 'http://192.168.4.2/stream' },
+                    { label: 'S3 Root (/)', url: 'http://192.168.4.2/' },
+                    { label: 'ESP2 AP (192.168.4.1)', url: 'http://192.168.4.1:81/stream' },
+                  ].map((preset) => (
+                    <button
+                      key={preset.url}
+                      type="button"
+                      onClick={() => setInputUrl(preset.url)}
+                      className={`text-[10px] px-2 py-1 rounded border transition-colors ${
+                        inputUrl === preset.url
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500'
+                          : 'bg-black text-slate-400 border-slate-800 hover:text-emerald-400 hover:border-slate-700'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="flex gap-2 justify-end mt-2">
                 <button
                   type="button"

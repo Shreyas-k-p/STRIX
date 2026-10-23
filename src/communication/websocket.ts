@@ -2,7 +2,7 @@
  * Browser WebSocket transport for the rover.
  * ESP2 advertises "rover-esp2.local" and exposes TCP port 81.
  */
-export const DEFAULT_ESP2_HOST = import.meta.env.VITE_ESP2_HOST || '10.82.165.164';
+export const DEFAULT_ESP2_HOST = import.meta.env.VITE_ESP2_HOST || '192.168.4.1';
 export const DEFAULT_ESP2_PORT = import.meta.env.VITE_ESP2_PORT || '81';
 export const ESP2_WS_URL = `ws://${DEFAULT_ESP2_HOST}:${DEFAULT_ESP2_PORT}`;
 

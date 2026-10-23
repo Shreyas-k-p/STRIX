@@ -1,36 +1,34 @@
-# 🚀 ROVER CONTROL CENTER (GCS)
+# 🚀 ROVER CONTROL CENTER (STRIX GCS)
 
-A high-performance, responsive Ground Control Station (GCS) web application for teleoperating and monitoring a custom multi-ESP32 6-wheel rover with NRF24L01 wireless telemetry and ESP32-S3 Wi-Fi live video streaming.
+A high-performance, responsive Ground Control Station (GCS) web application for teleoperating and monitoring the STRIX rover with direct ESP2 Wi-Fi WebSocket control and ESP32-S3 low-latency live video streaming.
 
 ---
 
 ## 🛰️ Rover Hardware Architecture
 
 ```
-Laptop Web App (Chrome / Edge / Opera)
+Laptop Ground Control Station Web App
       │
-      │ USB Serial (115200 Baud) [Web Serial API]
+      │ Wi-Fi WebSocket (ws://192.168.4.1:81)
       ▼
-ESP32 #4 (Laptop Bridge Controller)
-      │
-      │ NRF24L01+ 2.4GHz Wireless Mesh
-      ▼
-ESP32 #2 (Rover Gateway & Servo Controller)
-      │
-      ├──────────────────────────────┐
-      │ UART (Serial1)               │ UART (Serial2)
-      ▼                              ▼
-ESP32 #1 (Sensor Controller)    ESP32 #3 (Motor & Relay Controller)
-- DHT11 (Temp & Humidity)       - Dual L298N Drivers (6 DC Motors)
-- MQ-135 (Air Quality ADC)      - 4-Channel Relays
-- HC-SR04 (Ultrasonic Range)
-- IR Obstacle Sensor
+ESP2 Main Controller (AP: ESP2_ROVER | IP: 192.168.4.1)
+      ├── WebSocket Server (:81) ──> Web App Controls & Realtime Telemetry
+      ├── TCP Server (:82) <─────── ESP32-S3 Camera Diagnostics & Link
+      ├── UART2 (TX2:17, RX2:16) ─> ESP1 Sensor Controller (RX:25, TX:26)
+      │                             ├── DHT11 Temperature & Humidity (GPIO 33)
+      │                             ├── MQ-135 Air Quality (AO GPIO 34)
+      │                             ├── HC-SR04 Ultrasonic Range (TRIG:21, ECHO:35)
+      │                             ├── IR Obstacle Sensor (GPIO 27)
+      │                             └── Continuous 360° Servo (GPIO 32)
+      ├── L298N Dual Motor Drivers
+      │     ├── LEFT WHEELS  : ENA=33 (PWM), IN1=32, IN2=23
+      │     └── RIGHT WHEELS : ENB=22 (PWM), IN3=21, IN4=19
+      └── 4-Channel Relays (Active LOW: Relay 1=4, Relay 2=15, Relay 3=18, Relay 4=5)
 
-ESP32-S3 Camera Module
-      │
-      │ Direct 802.11 b/g/n Wi-Fi MJPEG Stream (Bypasses NRF24)
-      ▼
-Laptop Web App (Direct Video Feed)
+ESP32-S3 Camera Client (STA: IP 192.168.4.2)
+      ├── Connects to ESP2_ROVER AP (192.168.4.1)
+      ├── Low-Latency MJPEG Stream: http://192.168.4.2/stream (QVGA 320x240)
+      └── TCP Client to ESP2:82 for health diagnostics
 ```
 
 ---

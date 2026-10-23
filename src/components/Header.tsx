@@ -89,7 +89,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
             <p className="text-[11px] text-emerald-500/80 font-mono hidden sm:flex items-center gap-2">
               <Terminal className="w-3 h-3 text-emerald-400" />
-              <span>strix@rover-esp2:~$ ws://10.82.165.164:81 [TCP/PORT 81]</span>
+              <span>strix@rover-esp2:~$ ws://192.168.4.1:81 [TCP/PORT 81]</span>
               <span className="animate-blink text-emerald-400 font-black">_</span>
             </p>
           </div>
@@ -111,7 +111,7 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="font-bold text-slate-400">ESP2_WS:</span>
             <span className="font-black">
               {isConnected
-                ? 'CONNECTED (10.82.165.164:81)'
+                ? 'CONNECTED (192.168.4.1:81)'
                 : isConnecting
                 ? 'CONNECTING...'
                 : 'DISCONNECTED'}
